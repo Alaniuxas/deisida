@@ -120,50 +120,26 @@ export function roundToCents(amount: number): number {
   return Math.round(amount * 100) / 100;
 }
 
-/** Unit price display: 4 decimals under 1 €, otherwise standard cents. */
-export function formatUnitPrice(priceEur: number): string {
-  if (priceEur <= 0) return "—";
-  const fractionDigits = priceEur < 1 ? 4 : 2;
-  return new Intl.NumberFormat("lt-LT", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  }).format(priceEur);
-}
-
 export function getLineCatalogPrice(line: TileLine): number {
   return getTileById(line.tileId)?.priceEur ?? 0;
 }
 
-export function lineUnitPriceLabel(unit: QuantityUnit): string {
-  return unit === "pieces" ? "Kaina už vnt." : "Kaina už paletę";
-}
-
+/** Catalog price per brick; unchanged by quantity unit. */
 export function getLineUnitPrice(line: TileLine): number {
-  const tile = getTileById(line.tileId);
-  const palletPrice = tile?.priceEur ?? 0;
-  if (palletPrice <= 0) return 0;
-
-  if (line.quantityUnit === "pallets") {
-    return palletPrice;
-  }
-
-  const piecesPerPallet = tile?.quantityPerPallet ?? 0;
-  if (piecesPerPallet <= 0) return 0;
-
-  return palletPrice / piecesPerPallet;
+  return getLineCatalogPrice(line);
 }
 
 export function getLineSubtotal(line: TileLine): number {
-  return roundToCents(line.quantity * getLineUnitPrice(line));
-}
+  const unitPrice = getLineCatalogPrice(line);
+  if (unitPrice <= 0) return 0;
 
-export function formatLinePriceCell(line: TileLine): string {
-  const unitPrice = getLineUnitPrice(line);
-  if (unitPrice <= 0) return "—";
-  const suffix = line.quantityUnit === "pieces" ? "/ vnt." : "/ paletė";
-  return `${formatUnitPrice(unitPrice)} ${suffix}`;
+  if (line.quantityUnit === "pieces") {
+    return roundToCents(line.quantity * unitPrice);
+  }
+
+  const tile = getTileById(line.tileId);
+  const piecesPerPallet = tile?.quantityPerPallet ?? 0;
+  return roundToCents(line.quantity * piecesPerPallet * unitPrice);
 }
 
 export function getLineStorisMm(line: TileLine): number {

@@ -15,15 +15,15 @@ Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127`.
 
 ## App status (2026-09-24)
 
-- **Per line:** plytelė, auto pjovimo storis (from tile aukštis), kiekis with **vnt./paletės**, read-only kaina
-- **Pricing:** catalog `Kaina` is **per paletė**. Paletės → „Kaina už paletę“, line total = kiekis × katalogo kaina. Vnt. → „Kaina už vnt.“ = katalogo kaina ÷ plytų kiekis paletėje, line total = kiekis × exact unit price **rounded to cents**. Unit price under 1 € shows **4 decimal places** (e.g. 0,0333 € / vnt.); pallet prices stay 2 decimals (8,00 €). VAT and totals rounded to cents.
+- **Per line:** plytelė, auto pjovimo storis (from tile aukštis), kiekis with **vnt./paletės**, read-only **Kaina už vnt.**
+- **Pricing:** catalog `Kaina` is **per brick (vnt.)**. Display stays **8,00 €** for Kolumba regardless of vnt./paletės. **vnt.** line total = kiekis × katalogo kaina (100 vnt. → 800,00 €). **paletės** line total = kiekis × plytų kiekis paletėje × katalogo kaina (1 paletė Kolumba 240 → 1 920,00 €). Line totals, VAT, and sum rounded to cents.
 - **Once per order (form):** baras (pjūvis) and full pakavimas block
-- **Client preview/PDF:** no baras; optional **Pakavimas** block shows only affirmative choices (Taip tri-states + selected checkboxes). Omits the block when nothing applies. No yes/no dump. Price column header **Kaina**; cell shows amount with `/ vnt.` or `/ paletė`. Totals include 21 % PVM from line totals.
+- **Client preview/PDF:** no baras; optional **Pakavimas** block shows only affirmative choices. Price column **Kaina už vnt.** with catalog price; totals include 21 % PVM.
 - **Production preview/PDF:** baras and full packaging detail for the floor (no prices)
-- **Typography:** DM Sans (latin-ext) in on-screen previews and PDFs via `public/fonts/DMSans-*.woff`; Lithuanian letters (ą č ę ė į š ų ū ž) render correctly
+- **Typography:** DM Sans (latin-ext) in on-screen previews and PDFs via `public/fonts/DMSans-*.woff`
 - **Layout:** proposal headers use two clear columns; table headers and packaging lines show full words with word-boundary wrapping
-- **Downloads:** single working pair in page header only (`Atsisiųsti klientui` / `Atsisiųsti gamybai`); filenames `{numeris}_Klientui.pdf` / `{numeris}_Gamyba.pdf`; plain confirmation on success; validation errors shown in header area
+- **Downloads:** single working pair in page header only; filenames `{numeris}_Klientui.pdf` / `{numeris}_Gamyba.pdf`
 
-Screenshots: `/cursor/stores/self/media/proposal-lines/`, `/cursor/stores/self/media/proposal-downloads/`, `/cursor/stores/self/media/proposal-type/`, `/cursor/stores/self/media/proposal-price/` (`vnt-price.png`)
+Screenshots: `/cursor/stores/self/media/proposal-lines/`, `/cursor/stores/self/media/proposal-downloads/`, `/cursor/stores/self/media/proposal-type/`, `/cursor/stores/self/media/proposal-price/` (`restored-vnt.png`)
 
 Do not deploy without asking Alanas.
