@@ -107,12 +107,16 @@ export function ClientProposalPreview({
             </colgroup>
             <thead>
               <tr className="border-b border-stone-line bg-[#f3f3f0] text-left text-[11px] text-muted-foreground">
-                <th className="px-3 py-2.5 font-semibold">Plytelė</th>
-                <th className="px-3 py-2.5 font-semibold">Matmenys</th>
-                <th className="px-3 py-2.5 font-semibold leading-snug">Pjovimo storis</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Kiekis</th>
-                <th className="px-3 py-2.5 text-right font-semibold leading-snug">Kaina už vnt.</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Suma</th>
+                <th className="px-3 py-2.5 font-semibold leading-tight">Plytelė</th>
+                <th className="px-3 py-2.5 font-semibold leading-tight">Matmenys</th>
+                <th className="whitespace-normal px-3 py-2.5 font-semibold leading-tight">
+                  Pjovimo storis
+                </th>
+                <th className="px-3 py-2.5 text-right font-semibold leading-tight">Kiekis</th>
+                <th className="whitespace-normal px-3 py-2.5 text-right font-semibold leading-tight">
+                  Kaina už vnt.
+                </th>
+                <th className="px-3 py-2.5 text-right font-semibold leading-tight">Suma</th>
               </tr>
             </thead>
             <tbody>
