@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Proposal, QuantityUnit, TileLine } from "@/lib/types";
+import type { PackagingOptions, Proposal, QuantityUnit, TileLine } from "@/lib/types";
 import { PJUVIS_OPTIONS } from "@/lib/types";
 import {
   createDefaultProposal,
   createEmptyTileLine,
   formatCatalogPrice,
-  formatDimensions,
+  formatLineStoris,
   getLineCatalogPrice,
   quantityUnitLabel,
   validateProposal,
@@ -117,6 +117,73 @@ function TriStateSelect({
   );
 }
 
+function OrderPackagingEditor({
+  packaging,
+  onChange,
+}: {
+  packaging: PackagingOptions;
+  onChange: (packaging: PackagingOptions) => void;
+}) {
+  return (
+    <>
+      <div className="grid gap-x-4 gap-y-6 xl:grid-cols-5">
+        <TriStateSelect
+          id="order-intact"
+          label="Pakuoti tik neskilusi"
+          value={packaging.packOnlyIntact}
+          onChange={(packOnlyIntact) =>
+            onChange({ ...packaging, packOnlyIntact })
+          }
+        />
+        <TriStateSelect
+          id="order-two-parts"
+          label="Pakuoti į 2 dalis skilusi"
+          value={packaging.packTwoParts}
+          onChange={(packTwoParts) => onChange({ ...packaging, packTwoParts })}
+        />
+        <TriStateSelect
+          id="order-many-parts"
+          label="Pakuoti daugiau nei į 2 dalis"
+          value={packaging.packMoreThanTwoParts}
+          onChange={(packMoreThanTwoParts) =>
+            onChange({ ...packaging, packMoreThanTwoParts })
+          }
+        />
+        <TriStateSelect
+          id="order-leftovers"
+          label="Ar reikalingi likučiai"
+          value={packaging.needLeftovers}
+          onChange={(needLeftovers) => onChange({ ...packaging, needLeftovers })}
+        />
+      </div>
+
+      <div className="mt-4 grid gap-x-4 gap-y-6 xl:grid-cols-5">
+        {[
+          ["baseProtection", "Bazinė apsauga"],
+          ["bottomInterlayer", "Apatinis perklojimas"],
+          ["rowInterlayer", "Kiekvienos eilės perklojimas"],
+        ].map(([key, label]) => (
+          <FormField key={key} label=" ">
+            <label className="flex h-10 w-full items-center gap-2 rounded-md border border-stone-line bg-paper px-3 text-sm">
+              <Checkbox
+                id={`order-${key}`}
+                checked={packaging[key as keyof PackagingOptions] as boolean}
+                onCheckedChange={(checked) =>
+                  onChange({
+                    ...packaging,
+                    [key]: checked === true,
+                  })
+                }
+              />
+              <span className="line-clamp-2 leading-tight">{label}</span>
+            </label>
+          </FormField>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function TileLineEditor({
   line,
   index,
@@ -150,12 +217,7 @@ function TileLineEditor({
             value={line.tileId}
             onValueChange={(tileId) => {
               if (!tileId) return;
-              const selected = TILE_CATALOG.find((item) => item.id === tileId);
-              onChange({
-                ...line,
-                tileId,
-                storisMm: selected?.defaultStorisMm ?? line.storisMm,
-              });
+              onChange({ ...line, tileId });
             }}
           >
             <SelectTrigger className={controlClass}>
@@ -171,25 +233,12 @@ function TileLineEditor({
           </Select>
         </FormField>
 
-        <FormField label="Baras (pjūvis)">
-          <Select
-            value={line.pjovimas}
-            onValueChange={(pjovimas) => {
-              if (!pjovimas) return;
-              onChange({ ...line, pjovimas });
-            }}
+        <FormField label={tile ? `Pjovimo storis · ${tile.heightMm} mm` : "Pjovimo storis"}>
+          <div
+            className={`flex ${controlClass} items-center rounded-md border border-stone-line bg-[#f3f3f0] px-3 text-sm font-medium tabular-nums`}
           >
-            <SelectTrigger className={controlClass}>
-              <SelectDisplay value={line.pjovimas} />
-            </SelectTrigger>
-            <SelectContent>
-              {PJUVIS_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {formatLineStoris(line)}
+          </div>
         </FormField>
 
         <FormField label="Kiekis" htmlFor={`quantity-${line.id}`}>
@@ -234,133 +283,6 @@ function TileLineEditor({
             {formatCatalogPrice(getLineCatalogPrice(line))}
           </div>
         </FormField>
-      </div>
-
-      <div className="border-t border-stone-line bg-white px-6 py-8 lg:px-10">
-        <h4 className="mb-6 text-sm font-semibold uppercase tracking-[0.1em] text-deisida-muted">
-          Gamyba ir pakavimas
-        </h4>
-
-        <div className="grid gap-x-4 gap-y-6 xl:grid-cols-5">
-          <FormField
-            label={tile ? `Pjovimo storis · ${tile.heightMm} mm` : "Pjovimo storis (mm)"}
-            htmlFor={`storis-${line.id}`}
-          >
-            <Input
-              id={`storis-${line.id}`}
-              type="number"
-              min={1}
-              value={line.storisMm}
-              disabled={!line.showStoris}
-              onChange={(event) =>
-                onChange({ ...line, storisMm: Number(event.target.value) })
-              }
-              className={controlClass}
-            />
-          </FormField>
-
-          <TriStateSelect
-            id={`${line.id}-intact`}
-            label="Pakuoti tik neskilusi"
-            value={line.packaging.packOnlyIntact}
-            onChange={(packOnlyIntact) =>
-              onChange({
-                ...line,
-                packaging: { ...line.packaging, packOnlyIntact },
-              })
-            }
-          />
-          <TriStateSelect
-            id={`${line.id}-two-parts`}
-            label="Pakuoti į 2 dalis skilusi"
-            value={line.packaging.packTwoParts}
-            onChange={(packTwoParts) =>
-              onChange({
-                ...line,
-                packaging: { ...line.packaging, packTwoParts },
-              })
-            }
-          />
-          <TriStateSelect
-            id={`${line.id}-many-parts`}
-            label="Pakuoti daugiau nei į 2 dalis"
-            value={line.packaging.packMoreThanTwoParts}
-            onChange={(packMoreThanTwoParts) =>
-              onChange({
-                ...line,
-                packaging: { ...line.packaging, packMoreThanTwoParts },
-              })
-            }
-          />
-          <TriStateSelect
-            id={`${line.id}-leftovers`}
-            label="Ar reikalingi likučiai"
-            value={line.packaging.needLeftovers}
-            onChange={(needLeftovers) =>
-              onChange({
-                ...line,
-                packaging: { ...line.packaging, needLeftovers },
-              })
-            }
-          />
-        </div>
-
-        <div className="mt-4 grid gap-x-4 gap-y-6 xl:grid-cols-5">
-          {[
-            ["baseProtection", "Bazinė apsauga"],
-            ["bottomInterlayer", "Apatinis perklojimas"],
-            ["rowInterlayer", "Kiekvienos eilės perklojimas"],
-          ].map(([key, label]) => (
-            <FormField key={key} label=" ">
-              <label className="flex h-10 w-full items-center gap-2 rounded-md border border-stone-line bg-paper px-3 text-sm">
-                <Checkbox
-                  id={`${line.id}-${key}`}
-                  checked={line.packaging[key as keyof typeof line.packaging] as boolean}
-                  onCheckedChange={(checked) =>
-                    onChange({
-                      ...line,
-                      packaging: {
-                        ...line.packaging,
-                        [key]: checked === true,
-                      },
-                    })
-                  }
-                />
-                <span className="line-clamp-2 leading-tight">{label}</span>
-              </label>
-            </FormField>
-          ))}
-        </div>
-
-        {tile ? (
-          <div className="mt-4 rounded-md border border-dashed border-stone-line px-4 py-3 text-sm leading-relaxed text-muted-foreground xl:col-span-5">
-            <p>
-              {tile.supplier}
-              {tile.manufacturer ? ` · ${tile.manufacturer}` : ""}
-              {` · aukštis ${tile.heightMm} mm`}
-            </p>
-            <p>
-              Matmenys:{" "}
-              {formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)}
-              {tile.disc ? ` · ${tile.disc}` : ""}
-            </p>
-            {tile.description ? <p className="mt-1">{tile.description}</p> : null}
-          </div>
-        ) : null}
-
-        <div className="mt-6">
-          <Label htmlFor={`comment-${line.id}`} className={labelClass}>
-            Pastaba gamybai
-          </Label>
-          <Textarea
-            id={`comment-${line.id}`}
-            value={line.comment}
-            onChange={(event) => onChange({ ...line, comment: event.target.value })}
-            placeholder="Jei reikia, parašykite pastabą gamybai"
-            rows={2}
-            className="mt-0 min-h-20 bg-paper"
-          />
-        </div>
       </div>
     </div>
   );
@@ -650,6 +572,41 @@ export function ProposalCreator() {
                 canRemove={proposal.tileLines.length > 1}
               />
             ))}
+          </section>
+
+          <section className="border-t border-stone-line bg-white px-6 py-8 lg:px-10">
+            <h2 className="mb-6 text-lg font-semibold text-deisida-muted">
+              Baras ir pakavimas
+            </h2>
+            <div className="mb-8 max-w-xl">
+              <FormField label="Baras (pjūvis)">
+                <Select
+                  value={proposal.pjovimas}
+                  onValueChange={(pjovimas) => {
+                    if (!pjovimas) return;
+                    setProposal({ ...proposal, pjovimas });
+                  }}
+                >
+                  <SelectTrigger className={controlClass}>
+                    <SelectDisplay value={proposal.pjovimas} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PJUVIS_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </div>
+            <h3 className="mb-6 text-sm font-semibold uppercase tracking-[0.1em] text-deisida-muted">
+              Pakavimas
+            </h3>
+            <OrderPackagingEditor
+              packaging={proposal.packaging}
+              onChange={(packaging) => setProposal({ ...proposal, packaging })}
+            />
           </section>
 
           {(formError || validationErrors.length > 0 || pdfError) && (

@@ -3,7 +3,9 @@
 import type { Proposal } from "@/lib/types";
 import { L_CORNER_NOTE } from "@/lib/types";
 import {
+  describePackagingChoices,
   formatDimensions,
+  formatLineStoris,
   formatLtDate,
   formatLineQuantity,
   formatProductionPackagingSummary,
@@ -85,8 +87,6 @@ export function ProductionProposalPreview({
               </div>
               <dl className="px-4 py-1">
                 <DetailRow label="Plytelė" value={tile?.name ?? "—"} />
-                <DetailRow label="Baras" value={line.pjovimas} />
-                <DetailRow label="Pjūvis" value={line.pjovimas} />
                 <DetailRow
                   label="Matmenys"
                   value={
@@ -95,32 +95,35 @@ export function ProductionProposalPreview({
                       : "—"
                   }
                 />
-                <DetailRow
-                  label="Pjovimo storis"
-                  value={line.showStoris ? `${line.storisMm} mm` : "—"}
-                />
+                <DetailRow label="Pjovimo storis" value={formatLineStoris(line)} />
                 <DetailRow label="Kiekis" value={formatLineQuantity(line)} />
                 <DetailRow label="Diskas" value={tile?.disc ?? "—"} />
-                <DetailRow
-                  label="Pakavimas"
-                  value={formatProductionPackagingSummary(line.packaging)}
-                />
-                <DetailRow
-                  label="Likučiai"
-                  value={formatYesNo(line.packaging.needLeftovers)}
-                />
               </dl>
-              {line.comment.trim() ? (
-                <div className="mx-4 mb-4 border-l-4 border-deisida bg-[#f3f3f0] px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Pastaba gamybai
-                  </p>
-                  <p className="mt-1 text-sm leading-relaxed">{line.comment.trim()}</p>
-                </div>
-              ) : null}
             </div>
           );
         })}
+      </section>
+
+      <section className="mt-6 rounded-md border border-stone-line bg-[#f3f3f0] px-4 py-4">
+        <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-deisida-muted">
+          Baras ir pakavimas
+        </h3>
+        <dl className="space-y-2">
+          <DetailRow label="Baras" value={proposal.pjovimas} />
+          <DetailRow
+            label="Pakavimas"
+            value={formatProductionPackagingSummary(proposal.packaging)}
+          />
+          <DetailRow
+            label="Likučiai"
+            value={formatYesNo(proposal.packaging.needLeftovers)}
+          />
+        </dl>
+        <ul className="mt-3 space-y-1 text-xs leading-relaxed text-muted-foreground">
+          {describePackagingChoices(proposal.packaging).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
       </section>
 
       <footer className="mt-6 border-t border-stone-line pt-4">

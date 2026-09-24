@@ -51,7 +51,11 @@ export function applyPromptCorrection(
   }
 
   const messages: string[] = [];
-  let next: Proposal = { ...proposal, tileLines: [...proposal.tileLines] };
+  let next: Proposal = {
+    ...proposal,
+    tileLines: [...proposal.tileLines],
+    packaging: { ...proposal.packaging },
+  };
   let matched = false;
   const lower = trimmed.toLowerCase();
 
@@ -59,27 +63,6 @@ export function applyPromptCorrection(
   const lineIndex = lineIndexMatch
     ? Number(lineIndexMatch[1]) - 1
     : next.tileLines.length - 1;
-
-  if (
-    /(pasl[eė]pti|nerodyti|hide)\s+stori/.test(lower) ||
-    lower === "storis ne"
-  ) {
-    next.tileLines = updateLine(next.tileLines, lineIndex, (line) => ({
-      ...line,
-      showStoris: false,
-    }));
-    messages.push("Storis neberodomas.");
-    matched = true;
-  }
-
-  if (/(rodyti|show|atstatyti)\s+stori/.test(lower) || lower === "storis taip") {
-    next.tileLines = updateLine(next.tileLines, lineIndex, (line) => ({
-      ...line,
-      showStoris: true,
-    }));
-    messages.push("Storis rodomas.");
-    matched = true;
-  }
 
   const clientMatch =
     trimmed.match(/(?:keisti\s+klient[aą]|klientas)\s*[:\-]?\s*(.+)$/i) ??
@@ -135,18 +118,6 @@ export function applyPromptCorrection(
     matched = true;
   }
 
-  const storisMatch = trimmed.match(/(?:storis|storio)\s*[:\-]?\s*(\d+)/i);
-  if (storisMatch?.[1] && !/(pasl[eė]pti|rodyti|hide|show)/.test(lower)) {
-    const storis = Number(storisMatch[1]);
-    next.tileLines = updateLine(next.tileLines, lineIndex, (line) => ({
-      ...line,
-      storisMm: storis,
-      showStoris: true,
-    }));
-    messages.push(`Eilutė ${lineIndex + 1}: storis pakeistas į ${storis} mm.`);
-    matched = true;
-  }
-
   const tileMatch = trimmed.match(
     /(?:keisti\s+plytel[eę]|plytel[eę]|tile)\s*[:\-]?\s*(.+)$/i,
   );
@@ -157,7 +128,6 @@ export function applyPromptCorrection(
       next.tileLines = updateLine(next.tileLines, lineIndex, (line) => ({
         ...line,
         tileId,
-        storisMm: tile.defaultStorisMm,
       }));
       messages.push(`Eilutė ${lineIndex + 1}: plytelė pakeista į „${tile.name}“.`);
       matched = true;
@@ -214,26 +184,18 @@ export function applyPromptCorrection(
     const match = trimmed.match(rule.pattern);
     if (!match) continue;
 
-    next.tileLines = updateLine(next.tileLines, lineIndex, (line) => {
-      if (rule.isToggle) {
-        const enabled = match[1]
-          ? parseBoolean(match[1]) ?? true
-          : !line.packaging[rule.key];
-        return {
-          ...line,
-          packaging: setPackagingFlag(line.packaging, rule.key, enabled),
-        };
-      }
-
+    if (rule.isToggle) {
+      const enabled = match[1]
+        ? parseBoolean(match[1]) ?? true
+        : !next.packaging[rule.key];
+      next.packaging = setPackagingFlag(next.packaging, rule.key, enabled);
+    } else {
       const parsed = parseBoolean(match[1]);
-      if (parsed === null) return line;
-      return {
-        ...line,
-        packaging: { ...line.packaging, [rule.key]: parsed },
-      };
-    });
+      if (parsed === null) continue;
+      next.packaging = { ...next.packaging, [rule.key]: parsed };
+    }
 
-    messages.push(`Eilutė ${lineIndex + 1}: atnaujinta parinktis „${rule.label}“.`);
+    messages.push(`Atnaujinta parinktis „${rule.label}“.`);
     matched = true;
   }
 

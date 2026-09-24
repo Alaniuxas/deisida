@@ -31,13 +31,8 @@ export type QuantityUnit = "pieces" | "pallets";
 export interface TileLine {
   id: string;
   tileId: string;
-  pjovimas: string;
   quantity: number;
   quantityUnit: QuantityUnit;
-  storisMm: number;
-  showStoris: boolean;
-  comment: string;
-  packaging: PackagingOptions;
 }
 
 export interface Proposal {
@@ -47,6 +42,8 @@ export interface Proposal {
   client: string;
   object: string;
   comment: string;
+  pjovimas: string;
+  packaging: PackagingOptions;
   tileLines: TileLine[];
   extraClauses: string[];
 }

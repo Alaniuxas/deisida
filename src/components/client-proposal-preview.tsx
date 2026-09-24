@@ -3,8 +3,10 @@
 import type { Proposal } from "@/lib/types";
 import { L_CORNER_NOTE } from "@/lib/types";
 import {
+  describePackagingChoices,
   formatCatalogPrice,
   formatDimensions,
+  formatLineStoris,
   formatLtDate,
   formatLineQuantity,
   getLineSubtotal,
@@ -96,7 +98,6 @@ export function ClientProposalPreview({
             <thead>
               <tr className="border-b border-stone-line bg-[#f3f3f0] text-left text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
                 <th className="px-3 py-2.5 font-semibold">Plytelė</th>
-                <th className="px-3 py-2.5 font-semibold">Baras</th>
                 <th className="px-3 py-2.5 font-semibold">Matmenys</th>
                 <th className="px-3 py-2.5 font-semibold">Pjovimo storis</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Kiekis</th>
@@ -112,14 +113,13 @@ export function ClientProposalPreview({
                     <td className="px-3 py-3 align-middle font-medium">
                       {tile?.name ?? "—"}
                     </td>
-                    <td className="px-3 py-3 align-middle">{line.pjovimas}</td>
                     <td className="whitespace-nowrap px-3 py-3 align-middle text-xs">
                       {tile
                         ? formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)
                         : "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 align-middle tabular-nums">
-                      {line.showStoris ? `${line.storisMm} mm` : "—"}
+                      {formatLineStoris(line)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-right align-middle tabular-nums">
                       {formatLineQuantity(line)}
@@ -136,6 +136,21 @@ export function ClientProposalPreview({
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="mb-6 rounded-md border border-stone-line bg-[#f3f3f0] px-4 py-4">
+        <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-deisida-muted">
+          Gamyba ir pakavimas
+        </h3>
+        <dl className="space-y-2 text-xs leading-relaxed">
+          <div className="grid grid-cols-[8rem_1fr] gap-3">
+            <dt className="font-semibold text-muted-foreground">Baras</dt>
+            <dd>{proposal.pjovimas}</dd>
+          </div>
+          {describePackagingChoices(proposal.packaging).map((item) => (
+            <p key={item}>{item}</p>
+          ))}
+        </dl>
       </section>
 
       <section className="mb-6 flex justify-end">
@@ -157,9 +172,7 @@ export function ClientProposalPreview({
         </dl>
       </section>
 
-      {(proposal.comment ||
-        proposal.tileLines.some((line) => line.comment.trim()) ||
-        proposal.extraClauses.length > 0) && (
+      {(proposal.comment || proposal.extraClauses.length > 0) && (
         <section className="mb-4 rounded-md border border-stone-line bg-[#f3f3f0] px-4 py-4">
           <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-deisida-muted">
             Komentarai
@@ -171,14 +184,6 @@ export function ClientProposalPreview({
                 {proposal.comment}
               </p>
             ) : null}
-            {proposal.tileLines.map((line, index) =>
-              line.comment.trim() ? (
-                <p key={line.id}>
-                  <span className="font-semibold">Eilutė {index + 1}: </span>
-                  {line.comment.trim()}
-                </p>
-              ) : null,
-            )}
             {proposal.extraClauses.map((clause, index) => (
               <p key={`${clause}-${index}`}>
                 <span className="font-semibold">Papildoma sąlyga: </span>

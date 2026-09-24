@@ -23,17 +23,11 @@ export function generateProposalNumber(sequence = 2): string {
 }
 
 export function createEmptyTileLine(tileId?: string, id?: string): TileLine {
-  const tile = tileId ? getTileById(tileId) : undefined;
   return {
     id: id ?? `line-${crypto.randomUUID()}`,
-    tileId: tile?.id ?? TILE_FALLBACK_ID,
-    pjovimas: PJUVIS_OPTIONS[0],
+    tileId: tileId ?? TILE_FALLBACK_ID,
     quantity: 1,
     quantityUnit: "pallets",
-    storisMm: tile?.defaultStorisMm ?? 25,
-    showStoris: true,
-    comment: "",
-    packaging: defaultPackaging(),
   };
 }
 
@@ -49,6 +43,8 @@ export function createDefaultProposal(): Proposal {
     client: "",
     object: "",
     comment: "",
+    pjovimas: PJUVIS_OPTIONS[0],
+    packaging: defaultPackaging(),
     tileLines: [createEmptyTileLine("kolumba-k58", "line-1")],
     extraClauses: [],
   };
@@ -121,6 +117,15 @@ export function formatCatalogPrice(priceEur: number): string {
 
 export function getLineCatalogPrice(line: TileLine): number {
   return getTileById(line.tileId)?.priceEur ?? 0;
+}
+
+export function getLineStorisMm(line: TileLine): number {
+  return getTileById(line.tileId)?.heightMm ?? 0;
+}
+
+export function formatLineStoris(line: TileLine): string {
+  const storis = getLineStorisMm(line);
+  return storis > 0 ? `${storis} mm` : "—";
 }
 
 export function getLinePieceCount(line: TileLine): number {
@@ -204,9 +209,7 @@ export function describeLineSideInfo(line: TileLine, index: number): string[] {
   const tile = getTileById(line.tileId);
   const info: string[] = [`Eilutė ${index + 1} · ${tile?.name ?? "—"}`];
 
-  if (line.showStoris) {
-    info.push(`Storis: ${line.storisMm} mm`);
-  }
+  info.push(`Pjovimo storis: ${formatLineStoris(line)}`);
 
   if (tile) {
     info.push(
@@ -217,12 +220,6 @@ export function describeLineSideInfo(line: TileLine, index: number): string[] {
     if (tile.disc) info.push(`Diskas: ${tile.disc}`);
   }
 
-  info.push(...describePackagingChoices(line.packaging));
-
-  if (line.comment.trim()) {
-    info.push(`Komentaras: ${line.comment.trim()}`);
-  }
-
   return info;
 }
 
@@ -231,8 +228,7 @@ export function describeProductionLine(line: TileLine, index: number): string[] 
   const info: string[] = [
     `Užsakymo eilutė ${index + 1}`,
     `Plytelė: ${tile?.name ?? "—"}`,
-    `Baras: ${line.pjovimas}`,
-    `Pjovimo storis: ${line.showStoris ? `${line.storisMm} mm` : "—"}`,
+    `Pjovimo storis: ${formatLineStoris(line)}`,
   ];
 
   if (tile) {
@@ -247,7 +243,6 @@ export function describeProductionLine(line: TileLine, index: number): string[] 
   }
 
   info.push(`Kiekis: ${formatLineQuantity(line)}`);
-  info.push(...describePackagingChoices(line.packaging));
 
   return info;
 }
@@ -259,6 +254,7 @@ export function validateProposal(proposal: Proposal): string[] {
   if (!proposal.number.trim()) errors.push("Nurodykite pasiūlymo numerį.");
   if (!proposal.validUntil) errors.push("Nurodykite galiojimo datą.");
   if (!proposal.serviceDeadline) errors.push("Nurodykite paslaugos terminą.");
+  if (!proposal.pjovimas.trim()) errors.push("Pasirinkite barą (pjūvį).");
   if (proposal.tileLines.length === 0) {
     errors.push("Pridėkite bent vieną plytelių eilutę.");
   }
@@ -267,14 +263,8 @@ export function validateProposal(proposal: Proposal): string[] {
     if (!getTileById(line.tileId)) {
       errors.push(`Eilutė ${index + 1}: pasirinkite plytelę.`);
     }
-    if (!line.pjovimas.trim()) {
-      errors.push(`Eilutė ${index + 1}: pasirinkite pjūvį.`);
-    }
     if (line.quantity <= 0) {
       errors.push(`Eilutė ${index + 1}: kiekis turi būti didesnis už 0.`);
-    }
-    if (line.showStoris && line.storisMm <= 0) {
-      errors.push(`Eilutė ${index + 1}: nurodykite storį.`);
     }
   });
 

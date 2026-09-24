@@ -21,4 +21,4 @@ for (const cmd of commands) {
 
 console.log("valid", validateProposal(proposal).length === 0);
 console.log("extra", proposal.extraClauses);
-console.log("packIntact", proposal.tileLines[0].packaging.packOnlyIntact);
+console.log("packIntact", proposal.packaging.packOnlyIntact);

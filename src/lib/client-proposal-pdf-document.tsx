@@ -10,8 +10,10 @@ import {
 import type { Proposal } from "@/lib/types";
 import { L_CORNER_NOTE } from "@/lib/types";
 import {
+  describePackagingChoices,
   formatCatalogPrice,
   formatDimensions,
+  formatLineStoris,
   formatLtDate,
   formatLineQuantity,
   getLineSubtotal,
@@ -122,13 +124,22 @@ const styles = StyleSheet.create({
     padding: 5,
     fontSize: 7.5,
   },
-  colTile: { width: "16%" },
-  colBar: { width: "14%" },
-  colDim: { width: "16%" },
-  colThick: { width: "10%" },
+  colTile: { width: "20%" },
+  colDim: { width: "20%" },
+  colThick: { width: "12%" },
   colQty: { width: "16%", textAlign: "right" },
-  colUnit: { width: "12%", textAlign: "right" },
-  colSum: { width: "16%", textAlign: "right" },
+  colUnit: { width: "14%", textAlign: "right" },
+  colSum: { width: "18%", textAlign: "right" },
+  orderBox: {
+    border: `1pt solid ${brand.line}`,
+    backgroundColor: brand.panel,
+    padding: 10,
+    marginBottom: 12,
+  },
+  orderLine: {
+    fontSize: 7.5,
+    marginBottom: 2,
+  },
   totals: {
     alignSelf: "flex-end",
     width: "38%",
@@ -196,10 +207,7 @@ const styles = StyleSheet.create({
 
 export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
   const pricing = getProposalPricing(proposal);
-  const hasComments =
-    proposal.comment ||
-    proposal.tileLines.some((line) => line.comment.trim()) ||
-    proposal.extraClauses.length > 0;
+  const hasComments = proposal.comment || proposal.extraClauses.length > 0;
 
   return (
     <Document title={`Pasiūlymas ${proposal.number}`}>
@@ -242,7 +250,6 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
         <View style={styles.table}>
           <View style={styles.tableHeader}>
             <Text style={[styles.th, styles.colTile]}>Plytelė</Text>
-            <Text style={[styles.th, styles.colBar]}>Baras</Text>
             <Text style={[styles.th, styles.colDim]}>Matmenys</Text>
             <Text style={[styles.th, styles.colThick]}>Pjovimo storis</Text>
             <Text style={[styles.th, styles.colQty]}>Kiekis</Text>
@@ -254,14 +261,13 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
             return (
               <View key={line.id} style={styles.tableRow}>
                 <Text style={[styles.td, styles.colTile]}>{tile?.name ?? "—"}</Text>
-                <Text style={[styles.td, styles.colBar]}>{line.pjovimas}</Text>
                 <Text style={[styles.td, styles.colDim]}>
                   {tile
                     ? formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)
                     : "—"}
                 </Text>
                 <Text style={[styles.td, styles.colThick]}>
-                  {line.showStoris ? `${line.storisMm} mm` : "—"}
+                  {formatLineStoris(line)}
                 </Text>
                 <Text style={[styles.td, styles.colQty]}>
                   {formatLineQuantity(line)}
@@ -275,6 +281,16 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
               </View>
             );
           })}
+        </View>
+
+        <View style={styles.orderBox}>
+          <Text style={styles.commentTitle}>Gamyba ir pakavimas</Text>
+          <Text style={styles.orderLine}>Baras: {proposal.pjovimas}</Text>
+          {describePackagingChoices(proposal.packaging).map((item) => (
+            <Text key={item} style={styles.orderLine}>
+              {item}
+            </Text>
+          ))}
         </View>
 
         <View style={styles.totals}>
@@ -302,13 +318,6 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
                 Bendras komentaras: {proposal.comment}
               </Text>
             ) : null}
-            {proposal.tileLines.map((line, index) =>
-              line.comment.trim() ? (
-                <Text key={line.id} style={styles.commentLine}>
-                  Eilutė {index + 1}: {line.comment.trim()}
-                </Text>
-              ) : null,
-            )}
             {proposal.extraClauses.map((clause, index) => (
               <Text key={`${clause}-${index}`} style={styles.commentLine}>
                 Papildoma sąlyga: {clause}

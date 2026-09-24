@@ -10,7 +10,9 @@ import {
 import type { Proposal } from "@/lib/types";
 import { L_CORNER_NOTE } from "@/lib/types";
 import {
+  describePackagingChoices,
   formatDimensions,
+  formatLineStoris,
   formatLtDate,
   formatLineQuantity,
   formatProductionPackagingSummary,
@@ -114,23 +116,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: brand.paper,
   },
-  commentBox: {
-    marginTop: 8,
-    padding: 8,
+  orderBlock: {
+    marginTop: 4,
+    marginBottom: 12,
+    border: `1pt solid ${brand.line}`,
+    borderRadius: 4,
     backgroundColor: brand.panel,
-    borderLeft: `3pt solid ${brand.red}`,
+    padding: 12,
   },
-  commentLabel: {
-    fontSize: 7,
-    color: brand.muted,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: 3,
+  orderTitle: {
+    fontSize: 8,
     fontWeight: "bold",
+    color: brand.gray,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
   },
-  commentText: {
-    fontSize: 9,
-    lineHeight: 1.45,
+  orderLine: {
+    fontSize: 8,
+    marginBottom: 2,
   },
   noteBox: {
     marginTop: 10,
@@ -205,28 +209,15 @@ export function ProductionProposalDocument({ proposal }: { proposal: Proposal })
           const tile = getTileById(line.tileId);
           const rows = [
             { label: "Plytelė", value: tile?.name ?? "—" },
-            { label: "Baras", value: line.pjovimas },
-            { label: "Pjūvis", value: line.pjovimas },
             {
               label: "Matmenys",
               value: tile
                 ? formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)
                 : "—",
             },
-            {
-              label: "Pjovimo storis",
-              value: line.showStoris ? `${line.storisMm} mm` : "—",
-            },
+            { label: "Pjovimo storis", value: formatLineStoris(line) },
             { label: "Kiekis", value: formatLineQuantity(line) },
             { label: "Diskas", value: tile?.disc ?? "—" },
-            {
-              label: "Pakavimas",
-              value: formatProductionPackagingSummary(line.packaging),
-            },
-            {
-              label: "Likučiai",
-              value: formatYesNo(line.packaging.needLeftovers),
-            },
           ];
 
           return (
@@ -240,19 +231,29 @@ export function ProductionProposalDocument({ proposal }: { proposal: Proposal })
                     key={row.label}
                     label={row.label}
                     value={row.value}
-                    last={rowIndex === rows.length - 1 && !line.comment.trim()}
+                    last={rowIndex === rows.length - 1}
                   />
                 ))}
-                {line.comment.trim() ? (
-                  <View style={styles.commentBox}>
-                    <Text style={styles.commentLabel}>Pastaba gamybai</Text>
-                    <Text style={styles.commentText}>{line.comment.trim()}</Text>
-                  </View>
-                ) : null}
               </View>
             </View>
           );
         })}
+
+        <View style={styles.orderBlock}>
+          <Text style={styles.orderTitle}>Baras ir pakavimas</Text>
+          <Text style={styles.orderLine}>Baras: {proposal.pjovimas}</Text>
+          <Text style={styles.orderLine}>
+            Pakavimas: {formatProductionPackagingSummary(proposal.packaging)}
+          </Text>
+          <Text style={styles.orderLine}>
+            Likučiai: {formatYesNo(proposal.packaging.needLeftovers)}
+          </Text>
+          {describePackagingChoices(proposal.packaging).map((item) => (
+            <Text key={item} style={styles.orderLine}>
+              {item}
+            </Text>
+          ))}
+        </View>
 
         <View style={styles.noteBox}>
           <Text style={styles.noteTitle}>L-kampų pastaba</Text>
