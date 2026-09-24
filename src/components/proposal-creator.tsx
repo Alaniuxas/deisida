@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LithuanianDatePicker } from "@/components/lithuanian-date-picker";
 import { Textarea } from "@/components/ui/textarea";
 
 type MobileTab = "edit" | "client" | "production";
@@ -478,26 +479,22 @@ export function ProposalCreator() {
                   className={controlClass}
                 />
               </FormField>
-              <FormField label="Galiojimo pabaiga" htmlFor="valid-until">
-                <Input
+              <FormField label="Pasiūlymo galiojimo pabaiga" htmlFor="valid-until">
+                <LithuanianDatePicker
                   id="valid-until"
-                  type="date"
                   value={proposal.validUntil}
-                  onChange={(event) =>
-                    setProposal({ ...proposal, validUntil: event.target.value })
+                  onChange={(validUntil) =>
+                    setProposal({ ...proposal, validUntil })
                   }
-                  className={controlClass}
                 />
               </FormField>
-              <FormField label="Paslaugos terminas" htmlFor="service-deadline">
-                <Input
+              <FormField label="Paslaugos atlikimo terminas" htmlFor="service-deadline">
+                <LithuanianDatePicker
                   id="service-deadline"
-                  type="date"
                   value={proposal.serviceDeadline}
-                  onChange={(event) =>
-                    setProposal({ ...proposal, serviceDeadline: event.target.value })
+                  onChange={(serviceDeadline) =>
+                    setProposal({ ...proposal, serviceDeadline })
                   }
-                  className={controlClass}
                 />
               </FormField>
               <FormField label="Klientas" htmlFor="client">

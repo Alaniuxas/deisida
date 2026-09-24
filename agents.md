@@ -15,14 +15,15 @@ Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127`.
 
 ## App status (2026-09-24)
 
-- UI aligned with **deisida.lt**: DM Sans, `#c14546` accent, `#484849` / `#282829` text, `#F3F3F0` surfaces
-- Plain Lithuanian copy — no developer/technical phrases in the UI
-- **Ką pakeisti?** box: short title, one example, **Pritaikyti** button (client phrase + free-text comment behavior unchanged)
-- **Kiekis** with unit choice: **vnt.** or **paletės**; shown as entered in editor and both documents; pricing always per piece (paletės converted via katalogo `quantityPerPallet`)
-- **Two downloads**: **Klientui** (prices, VAT 21 %) and **Gamyba** (shop-floor info, no prices)
-- Peržiūra: **Klientui** / **Gamyba** tabs (desktop + mobile)
+- Full-screen working layout: **Pasiūlymo duomenys**, **Plytelės**, **Gamyba ir pakavimas**, **Peržiūra** (Klientui / Gamyba)
+- UI aligned with **deisida.lt** brand colors and DM Sans
+- Plain Lithuanian only — no correction/prompt box
+- Uniform form rows: labels + `h-10` controls on one baseline; kiekis with **vnt.** / **paletės** beside a full-width input
+- Packaging dropdowns show **Pasirinkite** when empty; options **Taip** / **Ne**
+- **Two downloads**: **Klientui** (prices, VAT 21 %) and **Gamyba** (shop-floor info)
+- Piece-based pricing with paletės conversion via catalog `quantityPerPallet`
 - Seeded tile catalog (4 example tiles)
 
-Screenshots: `/cursor/stores/self/media/proposal-plain/`
+Screenshots: `/cursor/stores/self/media/proposal-fullscreen/`
 
 Do not deploy without asking Alanas.

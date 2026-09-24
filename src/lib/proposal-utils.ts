@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { lt } from "date-fns/locale";
 import type { PackagingOptions, Proposal, QuantityUnit, TileLine } from "./types";
 import { PJUVIS_OPTIONS, defaultPackaging } from "./types";
@@ -12,10 +12,10 @@ export function generateProposalNumber(sequence = 2): string {
   return `DEI${stamp}-${sequence}`;
 }
 
-export function createEmptyTileLine(tileId?: string): TileLine {
+export function createEmptyTileLine(tileId?: string, id?: string): TileLine {
   const tile = tileId ? getTileById(tileId) : undefined;
   return {
-    id: crypto.randomUUID(),
+    id: id ?? `line-${crypto.randomUUID()}`,
     tileId: tile?.id ?? TILE_FALLBACK_ID,
     pjovimas: PJUVIS_OPTIONS[0],
     quantity: 1,
@@ -39,7 +39,7 @@ export function createDefaultProposal(): Proposal {
     client: "",
     object: "",
     comment: "",
-    tileLines: [createEmptyTileLine("kolumba-k58")],
+    tileLines: [createEmptyTileLine("kolumba-k58", "line-1")],
     extraClauses: [],
   };
 }
@@ -47,7 +47,7 @@ export function createDefaultProposal(): Proposal {
 export function formatLtDate(isoDate: string): string {
   if (!isoDate) return "—";
   try {
-    return format(new Date(isoDate), "yyyy-MM-dd", { locale: lt });
+    return format(parseISO(isoDate), "yyyy 'm.' MMMM d 'd.'", { locale: lt });
   } catch {
     return isoDate;
   }
