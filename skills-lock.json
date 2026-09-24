@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "design-system-ui": {
+      "source": "marcellocurto/skills",
+      "sourceType": "github",
+      "skillPath": "skills/design-system-ui/SKILL.md",
+      "computedHash": "33e4c9a2ba7dada411ab1ebb01674b78c0f9e1a10a7c48f264cca097271fcdef"
+    },
     "landing-page-design": {
       "source": "101-skills/superpowers",
       "sourceType": "github",

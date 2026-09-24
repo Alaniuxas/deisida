@@ -15,13 +15,14 @@ Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127`.
 
 ## App status (2026-09-24)
 
-- Lithuanian proposal creator with live A4 preview and PDF download
-- Seeded tile catalog (4 example tiles from screenshots)
-- Local prompt corrections (commands + freeform clauses), no cloud LLM
-- Fixed L kampų pjovimas note on every proposal
-- Verified: form → preview grid → prompt clause → PDF download (dev + prod)
-- Dev fix: `allowedDevOrigins` in `next.config.ts` (HMR was blocked, breaking React hydration)
+- Redesigned quote UI: warm stone palette, DM Sans + Source Serif 4, charcoal header
+- Main document lines show only **plytelė · pjūvis · kiekis · kaina** (catalog price)
+- Storis, packaging, specs, comments, L-kampų note in side appendix (editor + PDF)
+- Mobile tabs: **Redaguoti** / **Dokumentas** (preview always reachable)
+- Local prompt corrections incl. `pakeisk klientą į …` and freeform clauses
+- Seeded tile catalog (4 example tiles)
+- Dev fix: `allowedDevOrigins` in `next.config.ts`
 
-Worker agents use Composer 2.5. The coordinator only coordinates.
+Screenshots: `/cursor/stores/self/media/proposal-redesign/`
 
 Do not deploy without asking Alanas.

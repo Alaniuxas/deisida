@@ -30,7 +30,7 @@ export function PromptCorrectionBox({
   return (
     <section id="pataisos" className="editor-panel scroll-mt-24 p-5">
       <div className="mb-4">
-        <h2 className="font-serif text-lg font-semibold">Pataisos pagal užklausą</h2>
+        <h2 className="text-lg font-semibold text-deisida-muted">Pataisos pagal užklausą</h2>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Pataisymai taikomi vietoje, be debesies modelio. Naudokite komandas
           („klientas: UAB Statyba“, „pakeisk klientą į UAB Kauno Statyba“,

@@ -5,6 +5,7 @@ import { PJUVIS_OPTIONS, defaultPackaging } from "./types";
 import { getTileById } from "./tiles";
 
 const TILE_FALLBACK_ID = "kolumba-k58";
+export const VAT_RATE = 0.21;
 
 export function generateProposalNumber(sequence = 2): string {
   const stamp = format(new Date(), "yyMMdd");
@@ -77,6 +78,43 @@ export function getLineCatalogPrice(line: TileLine): number {
   return getTileById(line.tileId)?.priceEur ?? 0;
 }
 
+export function getLinePieceCount(line: TileLine): number {
+  const tile = getTileById(line.tileId);
+  if (!tile) return 0;
+  return Math.round(line.quantityPallets * tile.quantityPerPallet);
+}
+
+export function getLineUnitPrice(line: TileLine): number {
+  return getLineCatalogPrice(line);
+}
+
+export function getLineSubtotal(line: TileLine): number {
+  return getLinePieceCount(line) * getLineUnitPrice(line);
+}
+
+export interface ProposalPricing {
+  subtotal: number;
+  vat: number;
+  total: number;
+}
+
+export function getProposalPricing(proposal: Proposal): ProposalPricing {
+  const subtotal = proposal.tileLines.reduce(
+    (sum, line) => sum + getLineSubtotal(line),
+    0,
+  );
+  const vat = subtotal * VAT_RATE;
+  return { subtotal, vat, total: subtotal + vat };
+}
+
+export function formatPieceQuantity(line: TileLine): string {
+  const pieces = getLinePieceCount(line);
+  const palletsLabel = Number.isInteger(line.quantityPallets)
+    ? `${line.quantityPallets} pal.`
+    : `${line.quantityPallets} pal.`;
+  return `${pieces} vnt. (${palletsLabel})`;
+}
+
 export function describePackagingChoices(packaging: PackagingOptions): string[] {
   const lines: string[] = [
     `Pakuoti tik neskilusi gaminį: ${formatYesNo(packaging.packOnlyIntact)}`,
@@ -121,6 +159,32 @@ export function describeLineSideInfo(line: TileLine, index: number): string[] {
   if (line.comment.trim()) {
     info.push(`Komentaras: ${line.comment.trim()}`);
   }
+
+  return info;
+}
+
+export function describeProductionLine(line: TileLine, index: number): string[] {
+  const tile = getTileById(line.tileId);
+  const info: string[] = [
+    `Užsakymo eilutė ${index + 1}`,
+    `Plytelė: ${tile?.name ?? "—"}`,
+    `Baras: ${line.pjovimas}`,
+    `Pjovimo storis: ${line.showStoris ? `${line.storisMm} mm` : "—"}`,
+  ];
+
+  if (tile) {
+    info.push(
+      `Matmenys: ${formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)}`,
+    );
+    if (tile.disc) info.push(`Diskas: ${tile.disc}`);
+    if (tile.supplier) info.push(`Tiekėjas: ${tile.supplier}`);
+    if (tile.hardness !== undefined) info.push(`Kietumas: ${tile.hardness}`);
+    if (tile.fragilityStrip) info.push(`Brokas juostoje: ${tile.fragilityStrip}`);
+    if (tile.fragilityCorner) info.push(`Brokas kampuose: ${tile.fragilityCorner}`);
+  }
+
+  info.push(`Kiekis: ${formatPieceQuantity(line)}`);
+  info.push(...describePackagingChoices(line.packaging));
 
   return info;
 }
