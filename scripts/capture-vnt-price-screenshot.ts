@@ -48,7 +48,7 @@ async function main() {
   const previewText = await page.locator("aside article").first().innerText();
   const formPrice = await page
     .locator("#tile-line-0")
-    .getByText(/0,03\s*€|0,033\s*€/)
+    .getByText(/0,0333\s*€/)
     .first()
     .innerText()
     .catch(() => "");
@@ -58,7 +58,7 @@ async function main() {
       {
         screenshotPath,
         exists: fs.existsSync(screenshotPath),
-        previewHasPerPiecePrice: /0,03\s*€\s*\/\s*vnt\./.test(previewText),
+        previewHasPerPiecePrice: /0,0333\s*€\s*\/\s*vnt\./.test(previewText),
         previewHasLineTotal: /3,33\s*€/.test(previewText),
         previewHas100Vnt: previewText.includes("100 vnt."),
         formPrice,

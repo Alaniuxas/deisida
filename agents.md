@@ -16,7 +16,7 @@ Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127`.
 ## App status (2026-09-24)
 
 - **Per line:** plytelė, auto pjovimo storis (from tile aukštis), kiekis with **vnt./paletės**, read-only kaina
-- **Pricing:** catalog `Kaina` is **per paletė**. Paletės → „Kaina už paletę“, line total = kiekis × katalogo kaina. Vnt. → „Kaina už vnt.“ = katalogo kaina ÷ plytų kiekis paletėje, line total = kiekis × unit price (e.g. Kolumba 8 € / 240 × 100 = 3,33 €)
+- **Pricing:** catalog `Kaina` is **per paletė**. Paletės → „Kaina už paletę“, line total = kiekis × katalogo kaina. Vnt. → „Kaina už vnt.“ = katalogo kaina ÷ plytų kiekis paletėje, line total = kiekis × exact unit price **rounded to cents**. Unit price under 1 € shows **4 decimal places** (e.g. 0,0333 € / vnt.); pallet prices stay 2 decimals (8,00 €). VAT and totals rounded to cents.
 - **Once per order (form):** baras (pjūvis) and full pakavimas block
 - **Client preview/PDF:** no baras; optional **Pakavimas** block shows only affirmative choices (Taip tri-states + selected checkboxes). Omits the block when nothing applies. No yes/no dump. Price column header **Kaina**; cell shows amount with `/ vnt.` or `/ paletė`. Totals include 21 % PVM from line totals.
 - **Production preview/PDF:** baras and full packaging detail for the floor (no prices)

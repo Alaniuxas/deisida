@@ -8,7 +8,7 @@ import {
   createEmptyTileLine,
   formatCatalogPrice,
   formatLineStoris,
-  formatLinePriceCell,
+  formatUnitPrice,
   getLineUnitPrice,
   lineUnitPriceLabel,
   quantityUnitLabel,
@@ -282,7 +282,7 @@ function TileLineEditor({
           <div
             className={`flex ${controlClass} items-center rounded-md border border-stone-line bg-[#f3f3f0] px-3 text-sm font-medium tabular-nums`}
           >
-            {formatCatalogPrice(getLineUnitPrice(line))}
+            {formatUnitPrice(getLineUnitPrice(line))}
           </div>
         </FormField>
       </div>

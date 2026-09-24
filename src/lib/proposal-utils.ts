@@ -112,6 +112,23 @@ export function formatCatalogPrice(priceEur: number): string {
     style: "currency",
     currency: "EUR",
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(priceEur);
+}
+
+export function roundToCents(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+/** Unit price display: 4 decimals under 1 €, otherwise standard cents. */
+export function formatUnitPrice(priceEur: number): string {
+  if (priceEur <= 0) return "—";
+  const fractionDigits = priceEur < 1 ? 4 : 2;
+  return new Intl.NumberFormat("lt-LT", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(priceEur);
 }
 
@@ -139,14 +156,14 @@ export function getLineUnitPrice(line: TileLine): number {
 }
 
 export function getLineSubtotal(line: TileLine): number {
-  return line.quantity * getLineUnitPrice(line);
+  return roundToCents(line.quantity * getLineUnitPrice(line));
 }
 
 export function formatLinePriceCell(line: TileLine): string {
   const unitPrice = getLineUnitPrice(line);
   if (unitPrice <= 0) return "—";
   const suffix = line.quantityUnit === "pieces" ? "/ vnt." : "/ paletė";
-  return `${formatCatalogPrice(unitPrice)} ${suffix}`;
+  return `${formatUnitPrice(unitPrice)} ${suffix}`;
 }
 
 export function getLineStorisMm(line: TileLine): number {
@@ -194,12 +211,12 @@ export interface ProposalPricing {
 }
 
 export function getProposalPricing(proposal: Proposal): ProposalPricing {
-  const subtotal = proposal.tileLines.reduce(
-    (sum, line) => sum + getLineSubtotal(line),
-    0,
+  const subtotal = roundToCents(
+    proposal.tileLines.reduce((sum, line) => sum + getLineSubtotal(line), 0),
   );
-  const vat = subtotal * VAT_RATE;
-  return { subtotal, vat, total: subtotal + vat };
+  const vat = roundToCents(subtotal * VAT_RATE);
+  const total = roundToCents(subtotal + vat);
+  return { subtotal, vat, total };
 }
 
 /** @deprecated Use formatLineQuantity */
