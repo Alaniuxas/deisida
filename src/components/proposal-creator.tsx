@@ -29,9 +29,9 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { LithuanianDatePicker } from "@/components/lithuanian-date-picker";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -41,7 +41,7 @@ type PdfKind = "client" | "production";
 
 const controlClass = "h-10 w-full bg-paper";
 const labelClass =
-  "mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+  "block text-xs font-semibold uppercase tracking-[0.08em] leading-snug text-muted-foreground";
 
 function FormField({
   label,
@@ -53,12 +53,31 @@ function FormField({
   children: ReactNode;
 }) {
   return (
-    <div className="min-w-0">
-      <Label htmlFor={htmlFor} className={labelClass}>
-        {label}
-      </Label>
-      <div className="h-10">{children}</div>
+    <div className="grid min-w-0 grid-rows-[2.75rem_2.5rem]">
+      <div className="flex items-end pb-2">
+        <Label htmlFor={htmlFor} className={labelClass}>
+          {label}
+        </Label>
+      </div>
+      <div className="flex h-10 items-center">{children}</div>
     </div>
+  );
+}
+
+function SelectDisplay({
+  value,
+  placeholder = "Pasirinkite",
+}: {
+  value: string | null;
+  placeholder?: string;
+}) {
+  return (
+    <span
+      data-slot="select-value"
+      className={cn("truncate", !value && "text-muted-foreground")}
+    >
+      {value ?? placeholder}
+    </span>
   );
 }
 
@@ -73,21 +92,24 @@ function TriStateSelect({
   value: boolean | null;
   onChange: (value: boolean | null) => void;
 }) {
+  const displayValue =
+    value === null ? null : value ? "Taip" : "Ne";
+
   return (
     <FormField label={label} htmlFor={id}>
       <Select
-        value={value === null ? undefined : value ? "yes" : "no"}
+        value={value === null ? "pasirinkite" : value ? "taip" : "ne"}
         onValueChange={(next) => {
-          if (!next) onChange(null);
-          else onChange(next === "yes");
+          if (!next || next === "pasirinkite") onChange(null);
+          else onChange(next === "taip");
         }}
       >
         <SelectTrigger id={id} className={controlClass}>
-          <SelectValue placeholder="Pasirinkite" />
+          <SelectDisplay value={displayValue} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="yes">Taip</SelectItem>
-          <SelectItem value="no">Ne</SelectItem>
+          <SelectItem value="taip">Taip</SelectItem>
+          <SelectItem value="ne">Ne</SelectItem>
         </SelectContent>
       </Select>
     </FormField>
@@ -108,6 +130,7 @@ function TileLineEditor({
   canRemove: boolean;
 }) {
   const tile = TILE_CATALOG.find((item) => item.id === line.tileId);
+  const tileLabel = tile?.name ?? null;
 
   return (
     <div className="border-b border-stone-line last:border-b-0">
@@ -120,7 +143,7 @@ function TileLineEditor({
         ) : null}
       </div>
 
-      <div className="grid gap-6 px-6 py-6 lg:px-10 xl:grid-cols-4">
+      <div className="grid gap-x-4 gap-y-6 px-6 py-6 lg:px-10 xl:grid-cols-4">
         <FormField label="Plytelė">
           <Select
             value={line.tileId}
@@ -135,7 +158,7 @@ function TileLineEditor({
             }}
           >
             <SelectTrigger className={controlClass}>
-              <SelectValue placeholder="Pasirinkite" />
+              <SelectDisplay value={tileLabel} />
             </SelectTrigger>
             <SelectContent>
               {TILE_CATALOG.map((item) => (
@@ -156,7 +179,7 @@ function TileLineEditor({
             }}
           >
             <SelectTrigger className={controlClass}>
-              <SelectValue placeholder="Pasirinkite" />
+              <SelectDisplay value={line.pjovimas} />
             </SelectTrigger>
             <SelectContent>
               {PJUVIS_OPTIONS.map((option) => (
@@ -217,13 +240,9 @@ function TileLineEditor({
           Gamyba ir pakavimas
         </h4>
 
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-x-4 gap-y-6 xl:grid-cols-5">
           <FormField
-            label={
-              tile
-                ? `Pjovimo storis (mm) · aukštis ${tile.heightMm} mm`
-                : "Pjovimo storis (mm)"
-            }
+            label={tile ? `Pjovimo storis · ${tile.heightMm} mm` : "Pjovimo storis (mm)"}
             htmlFor={`storis-${line.id}`}
           >
             <Input
@@ -285,39 +304,39 @@ function TileLineEditor({
           />
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-x-4 gap-y-6 xl:grid-cols-5">
           {[
             ["baseProtection", "Bazinė apsauga"],
             ["bottomInterlayer", "Apatinis perklojimas"],
             ["rowInterlayer", "Kiekvienos eilės perklojimas"],
           ].map(([key, label]) => (
-            <label
-              key={key}
-              className="flex h-10 items-center gap-2 rounded-md border border-stone-line bg-paper px-3 text-sm"
-            >
-              <Checkbox
-                id={`${line.id}-${key}`}
-                checked={line.packaging[key as keyof typeof line.packaging] as boolean}
-                onCheckedChange={(checked) =>
-                  onChange({
-                    ...line,
-                    packaging: {
-                      ...line.packaging,
-                      [key]: checked === true,
-                    },
-                  })
-                }
-              />
-              <span>{label}</span>
-            </label>
+            <FormField key={key} label=" ">
+              <label className="flex h-10 w-full items-center gap-2 rounded-md border border-stone-line bg-paper px-3 text-sm">
+                <Checkbox
+                  id={`${line.id}-${key}`}
+                  checked={line.packaging[key as keyof typeof line.packaging] as boolean}
+                  onCheckedChange={(checked) =>
+                    onChange({
+                      ...line,
+                      packaging: {
+                        ...line.packaging,
+                        [key]: checked === true,
+                      },
+                    })
+                  }
+                />
+                <span className="line-clamp-2 leading-tight">{label}</span>
+              </label>
+            </FormField>
           ))}
         </div>
 
         {tile ? (
-          <div className="mt-6 rounded-md border border-dashed border-stone-line px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+          <div className="mt-4 rounded-md border border-dashed border-stone-line px-4 py-3 text-sm leading-relaxed text-muted-foreground xl:col-span-5">
             <p>
               {tile.supplier}
               {tile.manufacturer ? ` · ${tile.manufacturer}` : ""}
+              {` · aukštis ${tile.heightMm} mm`}
             </p>
             <p>
               Matmenys:{" "}

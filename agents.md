@@ -16,14 +16,15 @@ Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127`.
 ## App status (2026-09-24)
 
 - Full-screen working layout: **Pasiūlymo duomenys**, **Plytelės**, **Gamyba ir pakavimas**, **Peržiūra** (Klientui / Gamyba)
-- UI aligned with **deisida.lt** brand colors and DM Sans
-- Plain Lithuanian only — no correction/prompt box
-- Uniform form rows: labels + `h-10` controls on one baseline; kiekis with **vnt.** / **paletės** beside a full-width input
-- Packaging dropdowns show **Pasirinkite** when empty; options **Taip** / **Ne**
-- **Two downloads**: **Klientui** (prices, VAT 21 %) and **Gamyba** (shop-floor info)
-- Piece-based pricing with paletės conversion via catalog `quantityPerPallet`
+- Lithuanian calendar pickers for **Pasiūlymo galiojimo pabaiga** and **Paslaugos atlikimo terminas** (Monday week start, LT month/weekday names, dropdown month/year)
+- Chosen dates shown as e.g. `2026 m. spalio 24 d.`
+- Next.js dev indicator disabled (`devIndicators: false`); runtime errors fixed (broken Baras select JSX, controlled Select values)
+- Packaging tri-state selects show only **Pasirinkite**, **Taip**, **Ne** — no English yes/no/unset in UI, previews, or PDFs
+- Uniform form rows (`FormField` grid) with aligned labels, inputs, selects, and checkboxes
+- **vnt.** / **paletės** quantity choice with piece-based pricing
+- **Two downloads**: **Klientui** and **Gamyba**
 - Seeded tile catalog (4 example tiles)
 
-Screenshots: `/cursor/stores/self/media/proposal-fullscreen/`
+Audit screenshots: `/cursor/stores/self/media/proposal-audit/`
 
 Do not deploy without asking Alanas.

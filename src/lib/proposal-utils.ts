@@ -7,6 +7,16 @@ import { getTileById } from "./tiles";
 const TILE_FALLBACK_ID = "kolumba-k58";
 export const VAT_RATE = 0.21;
 
+export function parseLocalIsoDate(isoDate: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) return parseISO(isoDate);
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+export function formatIsoDateLocal(date: Date): string {
+  return format(date, "yyyy-MM-dd");
+}
+
 export function generateProposalNumber(sequence = 2): string {
   const stamp = format(new Date(), "yyMMdd");
   return `DEI${stamp}-${sequence}`;
@@ -34,8 +44,8 @@ export function createDefaultProposal(): Proposal {
 
   return {
     number: generateProposalNumber(2),
-    validUntil: format(inMonth, "yyyy-MM-dd"),
-    serviceDeadline: format(inMonth, "yyyy-MM-dd"),
+    validUntil: formatIsoDateLocal(inMonth),
+    serviceDeadline: formatIsoDateLocal(inMonth),
     client: "",
     object: "",
     comment: "",
@@ -47,7 +57,7 @@ export function createDefaultProposal(): Proposal {
 export function formatLtDate(isoDate: string): string {
   if (!isoDate) return "—";
   try {
-    return format(parseISO(isoDate), "yyyy 'm.' MMMM d 'd.'", { locale: lt });
+    return format(parseLocalIsoDate(isoDate), "yyyy 'm.' MMMM d 'd.'", { locale: lt });
   } catch {
     return isoDate;
   }

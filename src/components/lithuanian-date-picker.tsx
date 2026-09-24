@@ -1,24 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { lt } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  formatIsoDateLocal,
+  parseLocalIsoDate,
+} from "@/lib/proposal-utils";
 import { cn } from "@/lib/utils";
 
 export function formatLtDisplayDate(isoDate: string): string {
   if (!isoDate) return "Pasirinkite datą";
   try {
-    return format(parseISO(isoDate), "yyyy 'm.' MMMM d 'd.'", { locale: lt });
+    return format(parseLocalIsoDate(isoDate), "yyyy 'm.' MMMM d 'd.'", {
+      locale: lt,
+    });
   } catch {
     return isoDate;
   }
-}
-
-export function isoFromDate(date: Date): string {
-  return format(date, "yyyy-MM-dd");
 }
 
 interface LithuanianDatePickerProps {
@@ -38,7 +40,7 @@ export function LithuanianDatePicker({
   const selected = useMemo(() => {
     if (!value) return undefined;
     try {
-      return parseISO(value);
+      return parseLocalIsoDate(value);
     } catch {
       return undefined;
     }
@@ -67,7 +69,7 @@ export function LithuanianDatePicker({
           selected={selected}
           onSelect={(date) => {
             if (date) {
-              onChange(isoFromDate(date));
+              onChange(formatIsoDateLocal(date));
               setOpen(false);
             }
           }}
