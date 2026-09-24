@@ -43,8 +43,8 @@ export function ProductionProposalPreview({
 
   return (
     <article
-      className={`paper-shadow mx-auto w-full rounded-lg bg-paper text-ink ${
-        compact ? "p-4 text-[10px]" : "max-w-[210mm] p-8 text-sm"
+      className={`paper-shadow w-full rounded-lg bg-paper text-ink ${
+        compact ? "p-4 text-[10px]" : "p-6 text-sm xl:p-8"
       }`}
     >
       <header className="mb-6 flex flex-col gap-4 border-b-2 border-deisida-muted pb-5 sm:flex-row sm:items-start sm:justify-between">

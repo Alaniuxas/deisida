@@ -49,8 +49,8 @@ export function ClientProposalPreview({
 
   return (
     <article
-      className={`paper-shadow mx-auto w-full rounded-lg bg-paper text-ink ${
-        compact ? "p-4 text-[10px]" : "max-w-[210mm] p-8 text-sm"
+      className={`paper-shadow w-full rounded-lg bg-paper text-ink ${
+        compact ? "p-4 text-[10px]" : "p-6 text-sm xl:p-8"
       }`}
     >
       <header className="mb-6 flex flex-col gap-4 border-b-2 border-deisida pb-5 sm:flex-row sm:items-start sm:justify-between">
@@ -109,25 +109,25 @@ export function ClientProposalPreview({
                 const tile = getTileById(line.tileId);
                 return (
                   <tr key={line.id} className="border-b border-stone-line last:border-0">
-                    <td className="px-3 py-2.5 align-top font-medium">
+                    <td className="px-3 py-3 align-middle font-medium">
                       {tile?.name ?? "—"}
                     </td>
-                    <td className="px-3 py-2.5 align-top">{line.pjovimas}</td>
-                    <td className="px-3 py-2.5 align-top text-xs">
+                    <td className="px-3 py-3 align-middle">{line.pjovimas}</td>
+                    <td className="whitespace-nowrap px-3 py-3 align-middle text-xs">
                       {tile
                         ? formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)
                         : "—"}
                     </td>
-                    <td className="px-3 py-2.5 align-top tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-3 align-middle tabular-nums">
                       {line.showStoris ? `${line.storisMm} mm` : "—"}
                     </td>
-                    <td className="px-3 py-2.5 align-top text-right text-xs tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-3 text-right align-middle tabular-nums">
                       {formatLineQuantity(line)}
                     </td>
-                    <td className="px-3 py-2.5 align-top text-right tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-3 text-right align-middle tabular-nums">
                       {formatCatalogPrice(getLineUnitPrice(line))}
                     </td>
-                    <td className="px-3 py-2.5 align-top text-right font-medium tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-3 text-right align-middle font-medium tabular-nums">
                       {formatCatalogPrice(getLineSubtotal(line))}
                     </td>
                   </tr>

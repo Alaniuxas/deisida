@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Proposal, QuantityUnit, TileLine } from "@/lib/types";
 import { PJUVIS_OPTIONS } from "@/lib/types";
-import { applyPromptCorrection } from "@/lib/prompt-corrections";
 import {
   createDefaultProposal,
   createEmptyTileLine,
   formatCatalogPrice,
   formatDimensions,
-  formatLineQuantity,
   getLineCatalogPrice,
   quantityUnitLabel,
   validateProposal,
@@ -21,7 +19,6 @@ import {
 } from "@/components/pdf/proposal-pdf";
 import { ClientProposalPreview } from "@/components/client-proposal-preview";
 import { ProductionProposalPreview } from "@/components/production-proposal-preview";
-import { PromptCorrectionBox } from "@/components/prompt-correction-box";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,7 +36,30 @@ import { Textarea } from "@/components/ui/textarea";
 
 type MobileTab = "edit" | "client" | "production";
 type PreviewDoc = "client" | "production";
-type PdfKind = "client" | "production" | "both";
+type PdfKind = "client" | "production";
+
+const controlClass = "h-10 w-full bg-paper";
+const labelClass =
+  "mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+
+function FormField({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <Label htmlFor={htmlFor} className={labelClass}>
+        {label}
+      </Label>
+      <div className="h-10">{children}</div>
+    </div>
+  );
+}
 
 function TriStateSelect({
   id,
@@ -53,27 +73,23 @@ function TriStateSelect({
   onChange: (value: boolean | null) => void;
 }) {
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs leading-snug text-muted-foreground">
-        {label}
-      </Label>
+    <FormField label={label} htmlFor={id}>
       <Select
-        value={value === null ? "unset" : value ? "yes" : "no"}
+        value={value === null ? undefined : value ? "yes" : "no"}
         onValueChange={(next) => {
-          if (next === "unset") onChange(null);
+          if (!next) onChange(null);
           else onChange(next === "yes");
         }}
       >
-        <SelectTrigger id={id} className="w-full bg-paper">
-          <SelectValue />
+        <SelectTrigger id={id} className={controlClass}>
+          <SelectValue placeholder="Pasirinkite" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="yes">Taip</SelectItem>
           <SelectItem value="no">Ne</SelectItem>
-          <SelectItem value="unset">Nenurodyta</SelectItem>
         </SelectContent>
       </Select>
-    </div>
+    </FormField>
   );
 }
 
@@ -93,9 +109,9 @@ function TileLineEditor({
   const tile = TILE_CATALOG.find((item) => item.id === line.tileId);
 
   return (
-    <section className="editor-panel overflow-hidden">
-      <div className="flex items-center justify-between border-b border-stone-line bg-[#f3f3f0] px-4 py-3">
-        <h3 className="text-base font-semibold text-deisida-muted">Eilutė {index + 1}</h3>
+    <div className="border-b border-stone-line last:border-b-0">
+      <div className="flex items-center justify-between bg-[#f3f3f0] px-6 py-3 lg:px-10">
+        <h3 className="text-sm font-semibold text-deisida-muted">Eilutė {index + 1}</h3>
         {canRemove ? (
           <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
             Pašalinti
@@ -103,11 +119,8 @@ function TileLineEditor({
         ) : null}
       </div>
 
-      <div className="grid gap-3 border-b border-stone-line p-4 lg:grid-cols-[1.4fr_1.2fr_0.7fr_0.7fr]">
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-            Plytelė
-          </Label>
+      <div className="grid gap-6 px-6 py-6 lg:px-10 xl:grid-cols-4">
+        <FormField label="Plytelė">
           <Select
             value={line.tileId}
             onValueChange={(tileId) => {
@@ -120,8 +133,8 @@ function TileLineEditor({
               });
             }}
           >
-            <SelectTrigger className="bg-paper">
-              <SelectValue placeholder="Pasirinkite plytelę" />
+            <SelectTrigger className={controlClass}>
+              <SelectValue placeholder="Pasirinkite" />
             </SelectTrigger>
             <SelectContent>
               {TILE_CATALOG.map((item) => (
@@ -131,12 +144,9 @@ function TileLineEditor({
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </FormField>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-            Baras (pjūvis)
-          </Label>
+        <FormField label="Baras (pjūvis)">
           <Select
             value={line.pjovimas}
             onValueChange={(pjovimas) => {
@@ -144,8 +154,8 @@ function TileLineEditor({
               onChange({ ...line, pjovimas });
             }}
           >
-            <SelectTrigger className="bg-paper">
-              <SelectValue />
+            <SelectTrigger className={controlClass}>
+              <SelectValue placeholder="Pasirinkite" />
             </SelectTrigger>
             <SelectContent>
               {PJUVIS_OPTIONS.map((option) => (
@@ -155,16 +165,10 @@ function TileLineEditor({
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </FormField>
 
-        <div className="space-y-1.5">
-          <Label
-            htmlFor={`quantity-${line.id}`}
-            className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-          >
-            Kiekis
-          </Label>
-          <div className="flex items-center gap-2">
+        <FormField label="Kiekis" htmlFor={`quantity-${line.id}`}>
+          <div className="flex h-10 gap-2">
             <Input
               id={`quantity-${line.id}`}
               type="number"
@@ -177,14 +181,14 @@ function TileLineEditor({
                   quantity: Number(event.target.value),
                 })
               }
-              className="bg-paper tabular-nums"
+              className={`${controlClass} min-w-0 flex-1`}
             />
-            <div className="flex shrink-0 overflow-hidden rounded-md border border-stone-line">
+            <div className="flex h-10 shrink-0 overflow-hidden rounded-md border border-stone-line">
               {(["pieces", "pallets"] as QuantityUnit[]).map((unit) => (
                 <button
                   key={unit}
                   type="button"
-                  className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  className={`px-3 text-xs font-medium transition-colors ${
                     line.quantityUnit === unit
                       ? "bg-deisida text-deisida-foreground"
                       : "bg-paper text-muted-foreground hover:bg-[#f3f3f0]"
@@ -196,29 +200,31 @@ function TileLineEditor({
               ))}
             </div>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Dokumente: {formatLineQuantity(line)}
-          </p>
-        </div>
+        </FormField>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-            Kaina už vnt.
-          </Label>
-          <div className="flex h-8 items-center rounded-md border border-stone-line bg-[#f3f3f0] px-3 text-sm font-medium tabular-nums">
+        <FormField label="Kaina už vnt.">
+          <div
+            className={`flex ${controlClass} items-center rounded-md border border-stone-line bg-[#f3f3f0] px-3 text-sm font-medium tabular-nums`}
+          >
             {formatCatalogPrice(getLineCatalogPrice(line))}
           </div>
-        </div>
+        </FormField>
       </div>
 
-      <aside className="space-y-5 bg-white p-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          Gamybos ir pakavimo informacija
-        </p>
+      <div className="border-t border-stone-line bg-white px-6 py-8 lg:px-10">
+        <h4 className="mb-6 text-sm font-semibold uppercase tracking-[0.1em] text-deisida-muted">
+          Gamyba ir pakavimas
+        </h4>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-1.5">
-            <Label htmlFor={`storis-${line.id}`}>Pjovimo storis (mm)</Label>
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+          <FormField
+            label={
+              tile
+                ? `Pjovimo storis (mm) · aukštis ${tile.heightMm} mm`
+                : "Pjovimo storis (mm)"
+            }
+            htmlFor={`storis-${line.id}`}
+          >
             <Input
               id={`storis-${line.id}`}
               type="number"
@@ -228,12 +234,9 @@ function TileLineEditor({
               onChange={(event) =>
                 onChange({ ...line, storisMm: Number(event.target.value) })
               }
-              className="bg-paper"
+              className={controlClass}
             />
-            <p className="text-xs text-muted-foreground">
-              Aukštis kataloge: {tile ? `${tile.heightMm} mm` : "—"}
-            </p>
-          </div>
+          </FormField>
 
           <TriStateSelect
             id={`${line.id}-intact`}
@@ -281,7 +284,7 @@ function TileLineEditor({
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
           {[
             ["baseProtection", "Bazinė apsauga"],
             ["bottomInterlayer", "Apatinis perklojimas"],
@@ -289,7 +292,7 @@ function TileLineEditor({
           ].map(([key, label]) => (
             <label
               key={key}
-              className="flex items-center gap-2 rounded-md border border-stone-line bg-paper px-3 py-2 text-sm"
+              className="flex h-10 items-center gap-2 rounded-md border border-stone-line bg-paper px-3 text-sm"
             >
               <Checkbox
                 id={`${line.id}-${key}`}
@@ -310,7 +313,7 @@ function TileLineEditor({
         </div>
 
         {tile ? (
-          <div className="rounded-md border border-dashed border-stone-line px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+          <div className="mt-6 rounded-md border border-dashed border-stone-line px-4 py-3 text-sm leading-relaxed text-muted-foreground">
             <p>
               {tile.supplier}
               {tile.manufacturer ? ` · ${tile.manufacturer}` : ""}
@@ -324,192 +327,26 @@ function TileLineEditor({
           </div>
         ) : null}
 
-        <div className="space-y-1.5">
-          <Label htmlFor={`comment-${line.id}`}>Gamybos komentaras</Label>
+        <div className="mt-6">
+          <Label htmlFor={`comment-${line.id}`} className={labelClass}>
+            Pastaba gamybai
+          </Label>
           <Textarea
             id={`comment-${line.id}`}
             value={line.comment}
-            onChange={(event) =>
-              onChange({ ...line, comment: event.target.value })
-            }
-            placeholder="Pastaba gamybai"
+            onChange={(event) => onChange({ ...line, comment: event.target.value })}
+            placeholder="Jei reikia, parašykite pastabą gamybai"
             rows={2}
-            className="bg-paper"
+            className="mt-0 min-h-20 bg-paper"
           />
         </div>
-      </aside>
-    </section>
-  );
-}
-
-function EditorPanel({
-  proposal,
-  setProposal,
-  promptMessages,
-  onPromptApply,
-  formError,
-  validationErrors,
-  pdfState,
-  pdfError,
-  updateLine,
-}: {
-  proposal: Proposal;
-  setProposal: (proposal: Proposal) => void;
-  promptMessages: string[];
-  onPromptApply: (prompt: string) => void;
-  formError: string | null;
-  validationErrors: string[];
-  pdfState: "idle" | "loading" | "error";
-  pdfError: string | null;
-  updateLine: (index: number, line: TileLine) => void;
-}) {
-  return (
-    <div className="space-y-5">
-      <section className="editor-panel p-5">
-        <h2 className="text-lg font-semibold text-deisida-muted">Pasiūlymo antraštė</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="number">Pasiūlymo numeris</Label>
-            <Input
-              id="number"
-              value={proposal.number}
-              onChange={(event) =>
-                setProposal({ ...proposal, number: event.target.value })
-              }
-              className="bg-paper"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="valid-until">Galiojimo pabaiga</Label>
-            <Input
-              id="valid-until"
-              type="date"
-              value={proposal.validUntil}
-              onChange={(event) =>
-                setProposal({ ...proposal, validUntil: event.target.value })
-              }
-              className="bg-paper"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="service-deadline">Paslaugos terminas</Label>
-            <Input
-              id="service-deadline"
-              type="date"
-              value={proposal.serviceDeadline}
-              onChange={(event) =>
-                setProposal({ ...proposal, serviceDeadline: event.target.value })
-              }
-              className="bg-paper"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="client">Klientas</Label>
-            <Input
-              id="client"
-              value={proposal.client}
-              onChange={(event) =>
-                setProposal({ ...proposal, client: event.target.value })
-              }
-              placeholder="Įveskite kliento pavadinimą"
-              aria-invalid={!proposal.client.trim()}
-              className="bg-paper"
-            />
-          </div>
-          <div className="space-y-1.5 md:col-span-2">
-            <Label htmlFor="object">Objektas</Label>
-            <Input
-              id="object"
-              value={proposal.object}
-              onChange={(event) =>
-                setProposal({ ...proposal, object: event.target.value })
-              }
-              placeholder="Įveskite objekto pavadinimą"
-              aria-invalid={!proposal.object.trim()}
-              className="bg-paper"
-            />
-          </div>
-          <div className="space-y-1.5 md:col-span-2">
-            <Label htmlFor="comment">Pastaba klientui</Label>
-            <Textarea
-              id="comment"
-              value={proposal.comment}
-              onChange={(event) =>
-                setProposal({ ...proposal, comment: event.target.value })
-              }
-              placeholder="Jei reikia, parašykite pastabą klientui"
-              rows={3}
-              className="bg-paper"
-            />
-          </div>
-        </div>
-      </section>
-
-      <PromptCorrectionBox onApply={onPromptApply} messages={promptMessages} />
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-deisida-muted">Pasiūlymo eilutės</h2>
-            <p className="text-sm text-muted-foreground">
-              Klientui rodoma kaina ir kiekis. Gamybai — darbo informacija.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="border-stone-line bg-paper"
-            onClick={() =>
-              setProposal({
-                ...proposal,
-                tileLines: [...proposal.tileLines, createEmptyTileLine()],
-              })
-            }
-          >
-            + Pridėti eilutę
-          </Button>
-        </div>
-
-        {proposal.tileLines.map((line, index) => (
-          <TileLineEditor
-            key={line.id}
-            line={line}
-            index={index}
-            onChange={(next) => updateLine(index, next)}
-            onRemove={() =>
-              setProposal({
-                ...proposal,
-                tileLines: proposal.tileLines.filter((_, idx) => idx !== index),
-              })
-            }
-            canRemove={proposal.tileLines.length > 1}
-          />
-        ))}
-      </section>
-
-      {formError || validationErrors.length > 0 ? (
-        <Alert variant="destructive">
-          <AlertTitle>Patikrinkite formą</AlertTitle>
-          <AlertDescription>
-            {formError ?? validationErrors.join(" ")}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {pdfState === "error" && pdfError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Nepavyko paruošti failo</AlertTitle>
-          <AlertDescription>{pdfError}</AlertDescription>
-        </Alert>
-      ) : null}
+      </div>
     </div>
   );
 }
 
 export function ProposalCreator() {
   const [proposal, setProposal] = useState<Proposal>(() => createDefaultProposal());
-  const [promptMessages, setPromptMessages] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [pdfState, setPdfState] = useState<"idle" | "loading" | "error">("idle");
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -546,38 +383,30 @@ export function ProposalCreator() {
     setPdfError(null);
 
     try {
-      if (kind === "client" || kind === "both") {
+      if (kind === "client") {
         await downloadClientProposalPdf(proposal);
-      }
-      if (kind === "production" || kind === "both") {
+      } else {
         await downloadProductionProposalPdf(proposal);
       }
       setPdfState("idle");
     } catch (error) {
       setPdfState("error");
       setPdfError(
-        error instanceof Error ? error.message : "Nepavyko sugeneruoti PDF.",
+        error instanceof Error ? error.message : "Nepavyko paruošti failo.",
       );
     }
   };
 
-  const handlePromptApply = (prompt: string) => {
-    const result = applyPromptCorrection(proposal, prompt);
-    setProposal(result.proposal);
-    setPromptMessages(result.messages);
-    setFormError(null);
-    setMobileTab("client");
-  };
-
   const showEditor = mobileTab === "edit";
-  const showClientPreview = mobileTab === "client" || (!isMobileLayout && previewDoc === "client");
+  const showClientPreview =
+    mobileTab === "client" || (!isMobileLayout && previewDoc === "client");
   const showProductionPreview =
     mobileTab === "production" || (!isMobileLayout && previewDoc === "production");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-stone-line bg-white">
-        <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-5 lg:flex-row lg:items-end lg:justify-between lg:px-8">
+        <div className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-end lg:justify-between lg:px-10">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-deisida">
               Deisida
@@ -585,15 +414,12 @@ export function ProposalCreator() {
             <h1 className="mt-1 text-3xl font-bold tracking-tight text-deisida-muted">
               Pasiūlymo kūrimas
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Vienas užsakymas — du dokumentai: klientui ir gamybai.
-            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"
-              className="border-stone-line bg-paper"
+              className="h-10 border-stone-line bg-paper"
               onClick={() => setProposal(createDefaultProposal())}
             >
               Naujas pasiūlymas
@@ -601,7 +427,7 @@ export function ProposalCreator() {
             <Button
               type="button"
               variant="outline"
-              className="border-deisida-muted text-deisida-muted hover:bg-[#f3f3f0]"
+              className="h-10 border-deisida-muted text-deisida-muted hover:bg-[#f3f3f0]"
               onClick={() => handleDownloadPdf("production")}
               disabled={pdfState === "loading"}
             >
@@ -609,7 +435,7 @@ export function ProposalCreator() {
             </Button>
             <Button
               type="button"
-              className="bg-deisida text-deisida-foreground hover:bg-deisida/90"
+              className="h-10 bg-deisida text-deisida-foreground hover:bg-deisida/90"
               onClick={() => handleDownloadPdf("client")}
               disabled={pdfState === "loading"}
             >
@@ -619,56 +445,177 @@ export function ProposalCreator() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1400px] px-4 py-6 lg:px-8">
-        <div className="mb-4 xl:hidden">
-          <Tabs
-            value={mobileTab}
-            onValueChange={(value) => setMobileTab(value as MobileTab)}
-          >
-            <TabsList className="grid w-full grid-cols-3 bg-[#ececea]">
-              <TabsTrigger value="edit">Redaguoti</TabsTrigger>
-              <TabsTrigger value="client">Klientui</TabsTrigger>
-              <TabsTrigger value="production">Gamyba</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+      <div className="mb-0 border-b border-stone-line bg-[#ececea] xl:hidden">
+        <Tabs
+          value={mobileTab}
+          onValueChange={(value) => setMobileTab(value as MobileTab)}
+          className="px-4 py-3"
+        >
+          <TabsList className="grid h-10 w-full grid-cols-3">
+            <TabsTrigger value="edit">Redaguoti</TabsTrigger>
+            <TabsTrigger value="client">Klientui</TabsTrigger>
+            <TabsTrigger value="production">Gamyba</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
 
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.95fr)]">
-          <div className={showEditor ? "block" : "hidden xl:block"}>
-            <EditorPanel
-              proposal={proposal}
-              setProposal={setProposal}
-              promptMessages={promptMessages}
-              onPromptApply={handlePromptApply}
-              formError={formError}
-              validationErrors={validationErrors}
-              pdfState={pdfState}
-              pdfError={pdfError}
-              updateLine={updateLine}
-            />
-          </div>
-          <div
-            className={`${mobileTab === "edit" ? "hidden xl:block" : "block"} xl:sticky xl:top-6 xl:self-start`}
-          >
-            <div className="mb-3 hidden items-center justify-between gap-3 xl:flex">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Peržiūra
-              </p>
-              <Tabs
-                value={previewDoc}
-                onValueChange={(value) => setPreviewDoc(value as PreviewDoc)}
+      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+        <div
+          className={`min-w-0 flex-1 ${showEditor ? "block" : "hidden xl:block"} xl:overflow-y-auto`}
+        >
+          <section className="border-b border-stone-line bg-white px-6 py-8 lg:px-10">
+            <h2 className="mb-6 text-lg font-semibold text-deisida-muted">
+              Pasiūlymo duomenys
+            </h2>
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <FormField label="Pasiūlymo numeris" htmlFor="number">
+                <Input
+                  id="number"
+                  value={proposal.number}
+                  onChange={(event) =>
+                    setProposal({ ...proposal, number: event.target.value })
+                  }
+                  className={controlClass}
+                />
+              </FormField>
+              <FormField label="Galiojimo pabaiga" htmlFor="valid-until">
+                <Input
+                  id="valid-until"
+                  type="date"
+                  value={proposal.validUntil}
+                  onChange={(event) =>
+                    setProposal({ ...proposal, validUntil: event.target.value })
+                  }
+                  className={controlClass}
+                />
+              </FormField>
+              <FormField label="Paslaugos terminas" htmlFor="service-deadline">
+                <Input
+                  id="service-deadline"
+                  type="date"
+                  value={proposal.serviceDeadline}
+                  onChange={(event) =>
+                    setProposal({ ...proposal, serviceDeadline: event.target.value })
+                  }
+                  className={controlClass}
+                />
+              </FormField>
+              <FormField label="Klientas" htmlFor="client">
+                <Input
+                  id="client"
+                  value={proposal.client}
+                  onChange={(event) =>
+                    setProposal({ ...proposal, client: event.target.value })
+                  }
+                  placeholder="Kliento pavadinimas"
+                  aria-invalid={!proposal.client.trim()}
+                  className={controlClass}
+                />
+              </FormField>
+              <FormField label="Objektas" htmlFor="object">
+                <Input
+                  id="object"
+                  value={proposal.object}
+                  onChange={(event) =>
+                    setProposal({ ...proposal, object: event.target.value })
+                  }
+                  placeholder="Objekto pavadinimas"
+                  aria-invalid={!proposal.object.trim()}
+                  className={controlClass}
+                />
+              </FormField>
+            </div>
+            <div className="mt-6">
+              <Label htmlFor="comment" className={labelClass}>
+                Pastaba klientui
+              </Label>
+              <Textarea
+                id="comment"
+                value={proposal.comment}
+                onChange={(event) =>
+                  setProposal({ ...proposal, comment: event.target.value })
+                }
+                placeholder="Jei reikia, parašykite pastabą klientui"
+                rows={2}
+                className="min-h-20 bg-paper"
+              />
+            </div>
+          </section>
+
+          <section className="bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-line px-6 py-6 lg:px-10">
+              <h2 className="text-lg font-semibold text-deisida-muted">Plytelės</h2>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 border-stone-line bg-paper"
+                onClick={() =>
+                  setProposal({
+                    ...proposal,
+                    tileLines: [...proposal.tileLines, createEmptyTileLine()],
+                  })
+                }
               >
-                <TabsList className="h-8 bg-[#ececea]">
-                  <TabsTrigger value="client" className="text-xs">
-                    Klientui
-                  </TabsTrigger>
-                  <TabsTrigger value="production" className="text-xs">
-                    Gamyba
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+                Pridėti eilutę
+              </Button>
             </div>
 
+            {proposal.tileLines.map((line, index) => (
+              <TileLineEditor
+                key={line.id}
+                line={line}
+                index={index}
+                onChange={(next) => updateLine(index, next)}
+                onRemove={() =>
+                  setProposal({
+                    ...proposal,
+                    tileLines: proposal.tileLines.filter((_, idx) => idx !== index),
+                  })
+                }
+                canRemove={proposal.tileLines.length > 1}
+              />
+            ))}
+          </section>
+
+          {(formError || validationErrors.length > 0 || pdfError) && (
+            <div className="space-y-3 px-6 py-6 lg:px-10">
+              {formError || validationErrors.length > 0 ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Patikrinkite formą</AlertTitle>
+                  <AlertDescription>
+                    {formError ?? validationErrors.join(" ")}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              {pdfState === "error" && pdfError ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Nepavyko paruošti failo</AlertTitle>
+                  <AlertDescription>{pdfError}</AlertDescription>
+                </Alert>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        <aside
+          className={`border-stone-line bg-[#f3f3f0] xl:w-[min(520px,42vw)] xl:border-l ${
+            mobileTab === "edit" ? "hidden xl:flex" : "flex"
+          } min-h-0 flex-col`}
+        >
+          <div className="flex items-center justify-between border-b border-stone-line px-6 py-4 lg:px-8">
+            <h2 className="text-lg font-semibold text-deisida-muted">Peržiūra</h2>
+            <Tabs
+              value={previewDoc}
+              onValueChange={(value) => setPreviewDoc(value as PreviewDoc)}
+              className="hidden xl:block"
+            >
+              <TabsList className="h-10">
+                <TabsTrigger value="client">Klientui</TabsTrigger>
+                <TabsTrigger value="production">Gamyba</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 lg:p-8">
             {showClientPreview ? (
               <ClientProposalPreview
                 proposal={proposal}
@@ -686,8 +633,8 @@ export function ProposalCreator() {
               />
             ) : null}
           </div>
-        </div>
-      </main>
+        </aside>
+      </div>
     </div>
   );
 }
