@@ -34,6 +34,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { LithuanianDatePicker } from "@/components/lithuanian-date-picker";
 import { Textarea } from "@/components/ui/textarea";
+import { Download } from "lucide-react";
 
 type MobileTab = "edit" | "client" | "production";
 type PreviewDoc = "client" | "production";
@@ -365,11 +366,51 @@ function TileLineEditor({
   );
 }
 
+function DownloadButtons({
+  onDownload,
+  loading,
+  layout = "header",
+}: {
+  onDownload: (kind: PdfKind) => void;
+  loading: boolean;
+  layout?: "header" | "preview";
+}) {
+  const baseClass =
+    layout === "header"
+      ? "h-10"
+      : "h-10 flex-1 sm:flex-none";
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        className={`${baseClass} gap-2 border-deisida-muted text-deisida-muted hover:bg-[#f3f3f0]`}
+        onClick={() => onDownload("production")}
+        disabled={loading}
+      >
+        <Download className="size-4" />
+        Atsisiųsti gamybai
+      </Button>
+      <Button
+        type="button"
+        className={`${baseClass} gap-2 bg-deisida text-deisida-foreground hover:bg-deisida/90`}
+        onClick={() => onDownload("client")}
+        disabled={loading}
+      >
+        <Download className="size-4" />
+        {loading ? "Palaukite…" : "Atsisiųsti klientui"}
+      </Button>
+    </>
+  );
+}
+
 export function ProposalCreator() {
   const [proposal, setProposal] = useState<Proposal>(() => createDefaultProposal());
   const [formError, setFormError] = useState<string | null>(null);
   const [pdfState, setPdfState] = useState<"idle" | "loading" | "error">("idle");
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [downloadNote, setDownloadNote] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("edit");
   const [previewDoc, setPreviewDoc] = useState<PreviewDoc>("client");
   const [isMobileLayout, setIsMobileLayout] = useState(false);
@@ -381,6 +422,12 @@ export function ProposalCreator() {
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
+
+  useEffect(() => {
+    if (!downloadNote) return;
+    const timer = window.setTimeout(() => setDownloadNote(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, [downloadNote]);
 
   const validationErrors = useMemo(() => validateProposal(proposal), [proposal]);
 
@@ -403,11 +450,11 @@ export function ProposalCreator() {
     setPdfError(null);
 
     try {
-      if (kind === "client") {
-        await downloadClientProposalPdf(proposal);
-      } else {
-        await downloadProductionProposalPdf(proposal);
-      }
+      const filename =
+        kind === "client"
+          ? await downloadClientProposalPdf(proposal)
+          : await downloadProductionProposalPdf(proposal);
+      setDownloadNote(`Atsisiųsta: ${filename}`);
       setPdfState("idle");
     } catch (error) {
       setPdfState("error");
@@ -444,25 +491,18 @@ export function ProposalCreator() {
             >
               Naujas pasiūlymas
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 border-deisida-muted text-deisida-muted hover:bg-[#f3f3f0]"
-              onClick={() => handleDownloadPdf("production")}
-              disabled={pdfState === "loading"}
-            >
-              Gamybai
-            </Button>
-            <Button
-              type="button"
-              className="h-10 bg-deisida text-deisida-foreground hover:bg-deisida/90"
-              onClick={() => handleDownloadPdf("client")}
-              disabled={pdfState === "loading"}
-            >
-              {pdfState === "loading" ? "Palaukite…" : "Klientui"}
-            </Button>
+            <DownloadButtons
+              onDownload={handleDownloadPdf}
+              loading={pdfState === "loading"}
+              layout="header"
+            />
           </div>
         </div>
+        {downloadNote ? (
+          <div className="border-t border-stone-line bg-[#eef6ee] px-6 py-3 text-sm text-[#2d5a2d] lg:px-10">
+            {downloadNote}
+          </div>
+        ) : null}
       </header>
 
       <div className="mb-0 border-b border-stone-line bg-[#ececea] xl:hidden">
@@ -630,6 +670,22 @@ export function ProposalCreator() {
                 <TabsTrigger value="production">Gamyba</TabsTrigger>
               </TabsList>
             </Tabs>
+          </div>
+          <div className="border-b border-stone-line px-6 py-4 lg:px-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <DownloadButtons
+                onDownload={handleDownloadPdf}
+                loading={pdfState === "loading"}
+                layout="preview"
+              />
+            </div>
+            {downloadNote ? (
+              <p className="mt-3 text-sm text-[#2d5a2d]">{downloadNote}</p>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Paspauskite mygtuką — failas bus išsaugotas jūsų įrenginyje.
+              </p>
+            )}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-6 lg:p-8">
             {showClientPreview ? (

@@ -10,10 +10,11 @@ import {
 import type { Proposal } from "@/lib/types";
 import { L_CORNER_NOTE } from "@/lib/types";
 import {
-  describePackagingChoices,
   formatDimensions,
   formatLtDate,
   formatLineQuantity,
+  formatProductionPackagingSummary,
+  formatYesNo,
 } from "@/lib/proposal-utils";
 import { getTileById } from "@/lib/tiles";
 
@@ -37,242 +38,230 @@ const brand = {
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
-    fontSize: 8.5,
+    paddingTop: 36,
+    paddingBottom: 48,
+    paddingHorizontal: 40,
+    fontSize: 9,
     fontFamily: "Helvetica",
     color: brand.ink,
-    lineHeight: 1.35,
+    lineHeight: 1.4,
     backgroundColor: brand.paper,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    paddingBottom: 12,
+  hero: {
+    marginBottom: 18,
+    paddingBottom: 14,
     borderBottom: `2pt solid ${brand.gray}`,
   },
-  title: {
-    fontSize: 14,
+  heroTitle: {
+    fontSize: 20,
     fontWeight: "bold",
     color: brand.gray,
+    letterSpacing: 0.4,
   },
-  subtitle: {
-    fontSize: 8,
+  heroSub: {
+    marginTop: 4,
+    fontSize: 9,
     color: brand.muted,
-    marginTop: 2,
   },
-  metaBlock: { width: "48%" },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginBottom: 2,
-    gap: 6,
-  },
-  metaLabel: { color: brand.muted },
-  metaValue: { fontWeight: "bold" },
-  lineCard: {
-    border: `1pt solid ${brand.line}`,
+  metaCard: {
+    marginTop: 14,
+    padding: 12,
     backgroundColor: brand.panel,
-    padding: 10,
-    marginBottom: 10,
+    borderRadius: 4,
+    border: `1pt solid ${brand.line}`,
   },
-  lineTitle: {
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingVertical: 4,
+    borderBottom: `0.5pt solid ${brand.line}`,
+  },
+  detailRowLast: {
+    borderBottom: "none",
+  },
+  detailLabel: {
+    width: 92,
+    paddingRight: 8,
+    fontSize: 7,
+    color: brand.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    fontWeight: "bold",
+  },
+  detailValue: {
+    flex: 1,
+    fontSize: 9.5,
+    color: brand.ink,
+  },
+  lineBlock: {
+    marginBottom: 12,
+    border: `1pt solid ${brand.line}`,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  lineHeader: {
+    backgroundColor: brand.gray,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  lineHeaderText: {
     fontSize: 10,
     fontWeight: "bold",
-    color: brand.gray,
-    marginBottom: 8,
+    color: brand.paper,
   },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  field: {
-    width: "48%",
-    marginBottom: 4,
-  },
-  fieldWide: {
-    width: "100%",
-    marginBottom: 4,
-  },
-  fieldLabel: {
-    fontSize: 6.5,
-    color: brand.muted,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 2,
-    fontWeight: "bold",
-  },
-  fieldValue: {
-    fontSize: 8,
-  },
-  sectionDivider: {
-    borderTop: `1pt solid ${brand.line}`,
-    marginTop: 6,
-    paddingTop: 6,
-  },
-  sectionLabel: {
-    fontSize: 6.5,
-    color: brand.muted,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 4,
-    fontWeight: "bold",
-  },
-  bullet: {
-    fontSize: 7.5,
-    marginBottom: 2,
-  },
-  prodComment: {
-    marginTop: 6,
-    border: `1pt solid ${brand.red}`,
-    borderRadius: 2,
+  lineBody: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     backgroundColor: brand.paper,
-    padding: 6,
   },
-  prodCommentTitle: {
-    fontSize: 6.5,
-    color: brand.red,
+  commentBox: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: brand.panel,
+    borderLeft: `3pt solid ${brand.red}`,
+  },
+  commentLabel: {
+    fontSize: 7,
+    color: brand.muted,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 2,
+    letterSpacing: 0.4,
+    marginBottom: 3,
     fontWeight: "bold",
   },
-  globalComment: {
-    border: `1pt solid ${brand.line}`,
-    padding: 8,
-    marginBottom: 10,
+  commentText: {
+    fontSize: 9,
+    lineHeight: 1.45,
   },
   noteBox: {
+    marginTop: 10,
+    paddingTop: 10,
     borderTop: `1pt solid ${brand.line}`,
-    paddingTop: 8,
-    marginTop: 4,
   },
   noteTitle: {
     fontSize: 7,
     color: brand.red,
     textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: 3,
+    letterSpacing: 0.5,
+    marginBottom: 4,
     fontWeight: "bold",
+  },
+  noteText: {
+    fontSize: 8,
+    color: brand.muted,
+    lineHeight: 1.45,
   },
   footer: {
     position: "absolute",
-    bottom: 24,
+    bottom: 22,
     left: 40,
     right: 40,
     borderTop: `1pt solid ${brand.line}`,
     paddingTop: 6,
-    fontSize: 6.5,
+    fontSize: 7,
     color: brand.muted,
     flexDirection: "row",
     justifyContent: "space-between",
   },
 });
 
+function DetailRow({
+  label,
+  value,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  last?: boolean;
+}) {
+  return (
+    <View style={[styles.detailRow, last ? styles.detailRowLast : undefined]}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+}
+
 export function ProductionProposalDocument({ proposal }: { proposal: Proposal }) {
   return (
     <Document title={`Gamyba ${proposal.number}`}>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>GAMYBA</Text>
-            <Text style={styles.subtitle}>Darbo užduotis gamybai</Text>
-          </View>
-          <View style={styles.metaBlock}>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Užsakymo Nr.</Text>
-              <Text style={styles.metaValue}>{proposal.number}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Terminas</Text>
-              <Text style={styles.metaValue}>
-                {formatLtDate(proposal.serviceDeadline)}
-              </Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Klientas / objektas</Text>
-              <Text style={styles.metaValue}>
-                {proposal.client || "—"} · {proposal.object || "—"}
-              </Text>
-            </View>
+        <View style={styles.hero}>
+          <Text style={styles.heroTitle}>GAMYBA</Text>
+          <Text style={styles.heroSub}>Darbo lapas cechui</Text>
+
+          <View style={styles.metaCard}>
+            <DetailRow label="Užsakymo Nr." value={proposal.number} />
+            <DetailRow label="Klientas" value={proposal.client || "—"} />
+            <DetailRow label="Objektas" value={proposal.object || "—"} />
+            <DetailRow
+              label="Terminas"
+              value={formatLtDate(proposal.serviceDeadline)}
+              last
+            />
           </View>
         </View>
 
         {proposal.tileLines.map((line, index) => {
           const tile = getTileById(line.tileId);
+          const rows = [
+            { label: "Plytelė", value: tile?.name ?? "—" },
+            { label: "Baras", value: line.pjovimas },
+            { label: "Pjūvis", value: line.pjovimas },
+            {
+              label: "Matmenys",
+              value: tile
+                ? formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)
+                : "—",
+            },
+            {
+              label: "Pjovimo storis",
+              value: line.showStoris ? `${line.storisMm} mm` : "—",
+            },
+            { label: "Kiekis", value: formatLineQuantity(line) },
+            { label: "Diskas", value: tile?.disc ?? "—" },
+            {
+              label: "Pakavimas",
+              value: formatProductionPackagingSummary(line.packaging),
+            },
+            {
+              label: "Likučiai",
+              value: formatYesNo(line.packaging.needLeftovers),
+            },
+          ];
+
           return (
-            <View key={line.id} style={styles.lineCard}>
-              <Text style={styles.lineTitle}>Eilutė {index + 1}</Text>
-              <View style={styles.grid}>
-                <View style={styles.field}>
-                  <Text style={styles.fieldLabel}>Plytelė</Text>
-                  <Text style={styles.fieldValue}>{tile?.name ?? "—"}</Text>
-                </View>
-                <View style={styles.field}>
-                  <Text style={styles.fieldLabel}>Baras / pjūvis</Text>
-                  <Text style={styles.fieldValue}>{line.pjovimas}</Text>
-                </View>
-                <View style={styles.field}>
-                  <Text style={styles.fieldLabel}>Pjovimo storis</Text>
-                  <Text style={styles.fieldValue}>
-                    {line.showStoris ? `${line.storisMm} mm` : "—"}
-                  </Text>
-                </View>
-                <View style={styles.field}>
-                  <Text style={styles.fieldLabel}>Kiekis</Text>
-                  <Text style={styles.fieldValue}>{formatLineQuantity(line)}</Text>
-                </View>
-                {tile ? (
-                  <View style={styles.fieldWide}>
-                    <Text style={styles.fieldLabel}>Matmenys</Text>
-                    <Text style={styles.fieldValue}>
-                      {formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)}
-                    </Text>
-                  </View>
-                ) : null}
-                {tile?.disc ? (
-                  <View style={styles.fieldWide}>
-                    <Text style={styles.fieldLabel}>Diskas</Text>
-                    <Text style={styles.fieldValue}>{tile.disc}</Text>
-                  </View>
-                ) : null}
+            <View key={line.id} style={styles.lineBlock} wrap={false}>
+              <View style={styles.lineHeader}>
+                <Text style={styles.lineHeaderText}>Eilutė {index + 1}</Text>
               </View>
-
-              <View style={styles.sectionDivider}>
-                <Text style={styles.sectionLabel}>Pakavimas ir operacijos</Text>
-                {describePackagingChoices(line.packaging).map((item) => (
-                  <Text key={item} style={styles.bullet}>
-                    • {item}
-                  </Text>
+              <View style={styles.lineBody}>
+                {rows.map((row, rowIndex) => (
+                  <DetailRow
+                    key={row.label}
+                    label={row.label}
+                    value={row.value}
+                    last={rowIndex === rows.length - 1 && !line.comment.trim()}
+                  />
                 ))}
+                {line.comment.trim() ? (
+                  <View style={styles.commentBox}>
+                    <Text style={styles.commentLabel}>Pastaba gamybai</Text>
+                    <Text style={styles.commentText}>{line.comment.trim()}</Text>
+                  </View>
+                ) : null}
               </View>
-
-              {line.comment.trim() ? (
-                <View style={styles.prodComment}>
-                  <Text style={styles.prodCommentTitle}>Gamybos komentaras</Text>
-                  <Text style={styles.fieldValue}>{line.comment.trim()}</Text>
-                </View>
-              ) : null}
             </View>
           );
         })}
 
-        {proposal.comment ? (
-          <View style={styles.globalComment}>
-            <Text style={styles.sectionLabel}>Bendras gamybos komentaras</Text>
-            <Text style={styles.fieldValue}>{proposal.comment}</Text>
-          </View>
-        ) : null}
-
         <View style={styles.noteBox}>
           <Text style={styles.noteTitle}>L-kampų pastaba</Text>
-          <Text>{L_CORNER_NOTE}</Text>
+          <Text style={styles.noteText}>{L_CORNER_NOTE}</Text>
         </View>
 
         <View style={styles.footer} fixed>
-          <Text>DEISIDA · Gamyba {proposal.number}</Text>
-          <Text>Tik vidiniam naudojimui</Text>
+          <Text>DEISIDA · {proposal.number}</Text>
+          <Text>Gamyba</Text>
         </View>
       </Page>
     </Document>

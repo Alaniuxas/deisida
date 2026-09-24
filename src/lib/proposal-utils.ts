@@ -76,6 +76,40 @@ export function formatYesNo(value: boolean | null): string {
   return value ? "Taip" : "Ne";
 }
 
+export function proposalDownloadFilename(
+  number: string,
+  kind: "Klientui" | "Gamyba",
+): string {
+  const safe = number.trim().replace(/[^\w\d-]+/g, "_") || "pasiulymas";
+  return `${safe}_${kind}.pdf`;
+}
+
+export function formatProductionPackagingSummary(
+  packaging: PackagingOptions,
+): string {
+  const rules = [
+    packaging.packOnlyIntact !== null
+      ? `Tik neskilusi: ${formatYesNo(packaging.packOnlyIntact)}`
+      : null,
+    packaging.packTwoParts !== null
+      ? `2 dalys: ${formatYesNo(packaging.packTwoParts)}`
+      : null,
+    packaging.packMoreThanTwoParts !== null
+      ? `Daugiau nei 2 dalys: ${formatYesNo(packaging.packMoreThanTwoParts)}`
+      : null,
+  ].filter(Boolean);
+
+  const types: string[] = [];
+  if (packaging.baseProtection) types.push("Bazinė apsauga");
+  if (packaging.bottomInterlayer) types.push("Apatinis perklojimas");
+  if (packaging.rowInterlayer) types.push("Kiekvienos eilės perklojimas");
+
+  const parts = [...rules];
+  if (types.length > 0) parts.push(types.join(", "));
+
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
 export function formatCatalogPrice(priceEur: number): string {
   if (priceEur <= 0) return "—";
   return new Intl.NumberFormat("lt-LT", {

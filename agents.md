@@ -16,15 +16,13 @@ Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127`.
 ## App status (2026-09-24)
 
 - Full-screen working layout: **Pasiūlymo duomenys**, **Plytelės**, **Gamyba ir pakavimas**, **Peržiūra** (Klientui / Gamyba)
-- Lithuanian calendar pickers for **Pasiūlymo galiojimo pabaiga** and **Paslaugos atlikimo terminas** (Monday week start, LT month/weekday names, dropdown month/year)
-- Chosen dates shown as e.g. `2026 m. spalio 24 d.`
-- Next.js dev indicator disabled (`devIndicators: false`); runtime errors fixed (broken Baras select JSX, controlled Select values)
-- Packaging tri-state selects show only **Pasirinkite**, **Taip**, **Ne** — no English yes/no/unset in UI, previews, or PDFs
-- Uniform form rows (`FormField` grid) with aligned labels, inputs, selects, and checkboxes
-- **vnt.** / **paletės** quantity choice with piece-based pricing
-- **Two downloads**: **Klientui** and **Gamyba**
-- Seeded tile catalog (4 example tiles)
+- **Atsisiųsti klientui** and **Atsisiųsti gamybai** in the page header and above the preview panel
+- After download: plain confirmation `Atsisiųsta: {numeris}_Klientui.pdf` or `{numeris}_Gamyba.pdf`
+- Lithuanian calendar pickers; tri-state packaging selects show **Pasirinkite**, **Taip**, **Ne**
+- Client document: commercial PDF with prices (unchanged layout)
+- Production document: calm one-page shop sheet — order meta, then each tile as an aligned block (no prices)
+- **Two downloads** with filenames `{pasiūlymo numeris}_Klientui.pdf` and `{numeris}_Gamyba.pdf`
 
-Audit screenshots: `/cursor/stores/self/media/proposal-audit/`
+Screenshots: `/cursor/stores/self/media/proposal-downloads/`
 
 Do not deploy without asking Alanas.
