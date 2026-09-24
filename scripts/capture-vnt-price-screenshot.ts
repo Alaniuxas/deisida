@@ -33,10 +33,11 @@ async function main() {
   await page.locator("#object").fill("Vilniaus g. 12, Kaunas");
   await page.locator("#quantity-line-1").fill("100");
   await page.locator("#tile-line-0 button", { hasText: "vnt." }).click();
+  await page.getByRole("tab", { name: "Klientui" }).click();
   await page.waitForTimeout(500);
 
   const screenshotPath = path.join(MEDIA, "vnt-price.png");
-  await page.locator("aside table").screenshot({ path: screenshotPath });
+  await page.locator("aside article").first().screenshot({ path: screenshotPath });
 
   const previewText = await page.locator("aside article").first().innerText();
   const formPrice = await page
