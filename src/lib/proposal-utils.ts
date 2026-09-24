@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { lt } from "date-fns/locale";
 import type { PackagingOptions, Proposal, TileLine } from "./types";
-import { defaultPackaging } from "./types";
+import { PJUVIS_OPTIONS, defaultPackaging } from "./types";
 import { getTileById } from "./tiles";
 
 const TILE_FALLBACK_ID = "kolumba-k58";
@@ -16,6 +16,7 @@ export function createEmptyTileLine(tileId?: string): TileLine {
   return {
     id: crypto.randomUUID(),
     tileId: tile?.id ?? TILE_FALLBACK_ID,
+    pjovimas: PJUVIS_OPTIONS[0],
     quantityPallets: 1,
     storisMm: tile?.defaultStorisMm ?? 25,
     showStoris: true,
@@ -63,6 +64,19 @@ export function formatYesNo(value: boolean | null): string {
   return value ? "Taip" : "Ne";
 }
 
+export function formatCatalogPrice(priceEur: number): string {
+  if (priceEur <= 0) return "—";
+  return new Intl.NumberFormat("lt-LT", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+  }).format(priceEur);
+}
+
+export function getLineCatalogPrice(line: TileLine): number {
+  return getTileById(line.tileId)?.priceEur ?? 0;
+}
+
 export function describePackagingChoices(packaging: PackagingOptions): string[] {
   const lines: string[] = [
     `Pakuoti tik neskilusi gaminį: ${formatYesNo(packaging.packOnlyIntact)}`,
@@ -85,6 +99,32 @@ export function describePackagingChoices(packaging: PackagingOptions): string[] 
   return lines;
 }
 
+export function describeLineSideInfo(line: TileLine, index: number): string[] {
+  const tile = getTileById(line.tileId);
+  const info: string[] = [`Eilutė ${index + 1} · ${tile?.name ?? "—"}`];
+
+  if (line.showStoris) {
+    info.push(`Storis: ${line.storisMm} mm`);
+  }
+
+  if (tile) {
+    info.push(
+      `Matmenys: ${formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)}`,
+    );
+    if (tile.supplier) info.push(`Tiekėjas: ${tile.supplier}`);
+    if (tile.manufacturer) info.push(`Gamintojas: ${tile.manufacturer}`);
+    if (tile.disc) info.push(`Diskas: ${tile.disc}`);
+  }
+
+  info.push(...describePackagingChoices(line.packaging));
+
+  if (line.comment.trim()) {
+    info.push(`Komentaras: ${line.comment.trim()}`);
+  }
+
+  return info;
+}
+
 export function validateProposal(proposal: Proposal): string[] {
   const errors: string[] = [];
   if (!proposal.client.trim()) errors.push("Nurodykite klientą.");
@@ -99,6 +139,9 @@ export function validateProposal(proposal: Proposal): string[] {
   proposal.tileLines.forEach((line, index) => {
     if (!getTileById(line.tileId)) {
       errors.push(`Eilutė ${index + 1}: pasirinkite plytelę.`);
+    }
+    if (!line.pjovimas.trim()) {
+      errors.push(`Eilutė ${index + 1}: pasirinkite pjūvį.`);
     }
     if (line.quantityPallets <= 0) {
       errors.push(`Eilutė ${index + 1}: kiekis turi būti didesnis už 0.`);

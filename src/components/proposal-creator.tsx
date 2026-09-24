@@ -1,11 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Proposal, TileLine } from "@/lib/types";
+import { PJUVIS_OPTIONS } from "@/lib/types";
 import { applyPromptCorrection } from "@/lib/prompt-corrections";
 import {
   createDefaultProposal,
   createEmptyTileLine,
+  formatCatalogPrice,
+  formatDimensions,
+  getLineCatalogPrice,
   validateProposal,
 } from "@/lib/proposal-utils";
 import { TILE_CATALOG } from "@/lib/tiles";
@@ -14,11 +18,9 @@ import { PromptCorrectionBox } from "@/components/prompt-correction-box";
 import { ProposalPreview } from "@/components/proposal-preview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -26,10 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
-function YesNoField({
+function TriStateSelect({
   id,
   label,
   value,
@@ -41,40 +43,31 @@ function YesNoField({
   onChange: (value: boolean | null) => void;
 }) {
   return (
-    <div className="space-y-2">
-      <Label className="text-xs leading-snug">{label}</Label>
-      <RadioGroup
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-xs leading-snug text-muted-foreground">
+        {label}
+      </Label>
+      <Select
         value={value === null ? "unset" : value ? "yes" : "no"}
         onValueChange={(next) => {
           if (next === "unset") onChange(null);
           else onChange(next === "yes");
         }}
-        className="flex gap-4"
       >
-        <div className="flex items-center gap-2">
-          <RadioGroupItem value="yes" id={`${id}-yes`} />
-          <Label htmlFor={`${id}-yes`} className="font-normal">
-            Taip
-          </Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <RadioGroupItem value="no" id={`${id}-no`} />
-          <Label htmlFor={`${id}-no`} className="font-normal">
-            Ne
-          </Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <RadioGroupItem value="unset" id={`${id}-unset`} />
-          <Label htmlFor={`${id}-unset`} className="font-normal">
-            —
-          </Label>
-        </div>
-      </RadioGroup>
+        <SelectTrigger id={id} className="w-full bg-paper">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="yes">Taip</SelectItem>
+          <SelectItem value="no">Ne</SelectItem>
+          <SelectItem value="unset">Nenurodyta</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   );
 }
 
-function TileLineForm({
+function TileLineEditor({
   line,
   index,
   onChange,
@@ -87,100 +80,223 @@ function TileLineForm({
   onRemove: () => void;
   canRemove: boolean;
 }) {
-  const selectedTile = TILE_CATALOG.find((tile) => tile.id === line.tileId);
+  const tile = TILE_CATALOG.find((item) => item.id === line.tileId);
 
   return (
-    <Card className="border-dashed">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-sm">Plytelių eilutė {index + 1}</CardTitle>
-          {canRemove ? (
-            <Button type="button" variant="outline" size="sm" onClick={onRemove}>
-              Pašalinti
-            </Button>
-          ) : null}
+    <section className="editor-panel overflow-hidden">
+      <div className="flex items-center justify-between border-b border-stone-line bg-[#faf7f2] px-4 py-3">
+        <h3 className="font-serif text-base font-semibold">Eilutė {index + 1}</h3>
+        {canRemove ? (
+          <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+            Pašalinti
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 border-b border-stone-line p-4 lg:grid-cols-[1.4fr_1.2fr_0.7fr_0.7fr]">
+        <div className="space-y-1.5">
+          <Label className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+            Plytelė
+          </Label>
+          <Select
+            value={line.tileId}
+            onValueChange={(tileId) => {
+              if (!tileId) return;
+              const selected = TILE_CATALOG.find((item) => item.id === tileId);
+              onChange({
+                ...line,
+                tileId,
+                storisMm: selected?.defaultStorisMm ?? line.storisMm,
+              });
+            }}
+          >
+            <SelectTrigger className="bg-paper">
+              <SelectValue placeholder="Pasirinkite plytelę" />
+            </SelectTrigger>
+            <SelectContent>
+              {TILE_CATALOG.map((item) => (
+                <SelectItem key={item.id} value={item.id}>
+                  {item.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Plytelės pasirinkimas</Label>
-            <Select
-              value={line.tileId}
-              onValueChange={(tileId) => {
-                if (!tileId) return;
-                const tile = TILE_CATALOG.find((item) => item.id === tileId);
+
+        <div className="space-y-1.5">
+          <Label className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+            Pjūvis
+          </Label>
+          <Select
+            value={line.pjovimas}
+            onValueChange={(pjovimas) => {
+              if (!pjovimas) return;
+              onChange({ ...line, pjovimas });
+            }}
+          >
+            <SelectTrigger className="bg-paper">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PJUVIS_OPTIONS.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label
+            htmlFor={`quantity-${line.id}`}
+            className="text-xs uppercase tracking-[0.12em] text-muted-foreground"
+          >
+            Kiekis
+          </Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id={`quantity-${line.id}`}
+              type="number"
+              min={0}
+              step={0.5}
+              value={line.quantityPallets}
+              onChange={(event) =>
                 onChange({
                   ...line,
-                  tileId,
-                  storisMm: tile?.defaultStorisMm ?? line.storisMm,
-                });
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Pasirinkite plytelę" />
-              </SelectTrigger>
-              <SelectContent>
-                {TILE_CATALOG.map((tile) => (
-                  <SelectItem key={tile.id} value={tile.id}>
-                    {tile.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedTile ? (
-              <p className="text-xs text-muted-foreground">
-                {selectedTile.supplier}
-                {selectedTile.manufacturer ? ` · ${selectedTile.manufacturer}` : ""}
-                {" · "}
-                {selectedTile.lengthMm}×{selectedTile.widthMm}×{selectedTile.heightMm} mm
-              </p>
-            ) : null}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor={`quantity-${line.id}`}>
-                Atvykstantis kiekis (paletėmis)
-              </Label>
-              <Input
-                id={`quantity-${line.id}`}
-                type="number"
-                min={0}
-                step={0.5}
-                value={line.quantityPallets}
-                onChange={(event) =>
-                  onChange({
-                    ...line,
-                    quantityPallets: Number(event.target.value),
-                  })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={`storis-${line.id}`}>Storis (mm)</Label>
-              <Input
-                id={`storis-${line.id}`}
-                type="number"
-                min={1}
-                value={line.storisMm}
-                disabled={!line.showStoris}
-                onChange={(event) =>
-                  onChange({
-                    ...line,
-                    storisMm: Number(event.target.value),
-                  })
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                Storis nėra tas pats kaip aukštis (
-                {selectedTile ? `${selectedTile.heightMm} mm` : "—"}).
-              </p>
-            </div>
+                  quantityPallets: Number(event.target.value),
+                })
+              }
+              className="bg-paper tabular-nums"
+            />
+            <span className="text-xs text-muted-foreground">pal.</span>
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
+          <Label className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+            Kaina
+          </Label>
+          <div className="flex h-8 items-center rounded-lg border border-stone-line bg-[#f7f2ea] px-3 text-sm font-medium tabular-nums">
+            {formatCatalogPrice(getLineCatalogPrice(line))}
+          </div>
+        </div>
+      </div>
+
+      <aside className="space-y-5 bg-[#fcfaf6] p-4">
+        <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          Papildoma informacija · neįeina į pagrindinę eilutę
+        </p>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="space-y-1.5">
+            <Label htmlFor={`storis-${line.id}`}>Storis (mm)</Label>
+            <Input
+              id={`storis-${line.id}`}
+              type="number"
+              min={1}
+              value={line.storisMm}
+              disabled={!line.showStoris}
+              onChange={(event) =>
+                onChange({ ...line, storisMm: Number(event.target.value) })
+              }
+              className="bg-paper"
+            />
+            <p className="text-xs text-muted-foreground">
+              Aukštis kataloge: {tile ? `${tile.heightMm} mm` : "—"}
+            </p>
+          </div>
+
+          <TriStateSelect
+            id={`${line.id}-intact`}
+            label="Pakuoti tik neskilusi"
+            value={line.packaging.packOnlyIntact}
+            onChange={(packOnlyIntact) =>
+              onChange({
+                ...line,
+                packaging: { ...line.packaging, packOnlyIntact },
+              })
+            }
+          />
+          <TriStateSelect
+            id={`${line.id}-two-parts`}
+            label="Pakuoti į 2 dalis skilusi"
+            value={line.packaging.packTwoParts}
+            onChange={(packTwoParts) =>
+              onChange({
+                ...line,
+                packaging: { ...line.packaging, packTwoParts },
+              })
+            }
+          />
+          <TriStateSelect
+            id={`${line.id}-many-parts`}
+            label="Pakuoti daugiau nei į 2 dalis"
+            value={line.packaging.packMoreThanTwoParts}
+            onChange={(packMoreThanTwoParts) =>
+              onChange({
+                ...line,
+                packaging: { ...line.packaging, packMoreThanTwoParts },
+              })
+            }
+          />
+          <TriStateSelect
+            id={`${line.id}-leftovers`}
+            label="Ar reikalingi likučiai"
+            value={line.packaging.needLeftovers}
+            onChange={(needLeftovers) =>
+              onChange({
+                ...line,
+                packaging: { ...line.packaging, needLeftovers },
+              })
+            }
+          />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            ["baseProtection", "Bazinė apsauga"],
+            ["bottomInterlayer", "Apatinis perklojimas"],
+            ["rowInterlayer", "Kiekvienos eilės perklojimas"],
+          ].map(([key, label]) => (
+            <label
+              key={key}
+              className="flex items-center gap-2 rounded-lg border border-stone-line bg-paper px-3 py-2 text-sm"
+            >
+              <Checkbox
+                id={`${line.id}-${key}`}
+                checked={line.packaging[key as keyof typeof line.packaging] as boolean}
+                onCheckedChange={(checked) =>
+                  onChange({
+                    ...line,
+                    packaging: {
+                      ...line.packaging,
+                      [key]: checked === true,
+                    },
+                  })
+                }
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+
+        {tile ? (
+          <div className="rounded-lg border border-dashed border-stone-line px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+            <p>
+              {tile.supplier}
+              {tile.manufacturer ? ` · ${tile.manufacturer}` : ""}
+            </p>
+            <p>
+              Matmenys:{" "}
+              {formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)}
+              {tile.disc ? ` · ${tile.disc}` : ""}
+            </p>
+            {tile.description ? <p className="mt-1">{tile.description}</p> : null}
+          </div>
+        ) : null}
+
+        <div className="space-y-1.5">
           <Label htmlFor={`comment-${line.id}`}>Komentaras plytelei</Label>
           <Textarea
             id={`comment-${line.id}`}
@@ -188,92 +304,178 @@ function TileLineForm({
             onChange={(event) =>
               onChange({ ...line, comment: event.target.value })
             }
-            placeholder="Įrašykite komentarą plytelei prie kuriamo užsakymo"
+            placeholder="Techninė pastaba šiai eilutei"
             rows={2}
+            className="bg-paper"
           />
         </div>
+      </aside>
+    </section>
+  );
+}
 
-        <Separator />
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-4 rounded-md border p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide">Pasirinkimai</p>
-            <YesNoField
-              id={`${line.id}-intact`}
-              label="Pakuoti tik neskilusi gaminį"
-              value={line.packaging.packOnlyIntact}
-              onChange={(packOnlyIntact) =>
-                onChange({
-                  ...line,
-                  packaging: { ...line.packaging, packOnlyIntact },
-                })
+function EditorPanel({
+  proposal,
+  setProposal,
+  promptMessages,
+  onPromptApply,
+  formError,
+  validationErrors,
+  pdfState,
+  pdfError,
+  updateLine,
+}: {
+  proposal: Proposal;
+  setProposal: (proposal: Proposal) => void;
+  promptMessages: string[];
+  onPromptApply: (prompt: string) => void;
+  formError: string | null;
+  validationErrors: string[];
+  pdfState: "idle" | "loading" | "error";
+  pdfError: string | null;
+  updateLine: (index: number, line: TileLine) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <section className="editor-panel p-5">
+        <h2 className="font-serif text-lg font-semibold">Pasiūlymo antraštė</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="number">Pasiūlymo numeris</Label>
+            <Input
+              id="number"
+              value={proposal.number}
+              onChange={(event) =>
+                setProposal({ ...proposal, number: event.target.value })
               }
-            />
-            <YesNoField
-              id={`${line.id}-two-parts`}
-              label="Pakuoti į 2 dalis skilusi gaminį"
-              value={line.packaging.packTwoParts}
-              onChange={(packTwoParts) =>
-                onChange({
-                  ...line,
-                  packaging: { ...line.packaging, packTwoParts },
-                })
-              }
-            />
-            <YesNoField
-              id={`${line.id}-many-parts`}
-              label="Pakuoti daugiau nei į 2 dalis skilusi (visą dūžį)"
-              value={line.packaging.packMoreThanTwoParts}
-              onChange={(packMoreThanTwoParts) =>
-                onChange({
-                  ...line,
-                  packaging: { ...line.packaging, packMoreThanTwoParts },
-                })
-              }
-            />
-            <YesNoField
-              id={`${line.id}-leftovers`}
-              label="Ar reikalingi likučiai"
-              value={line.packaging.needLeftovers}
-              onChange={(needLeftovers) =>
-                onChange({
-                  ...line,
-                  packaging: { ...line.packaging, needLeftovers },
-                })
-              }
+              className="bg-paper"
             />
           </div>
-
-          <div className="space-y-3 rounded-md border p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide">Pakavimas</p>
-            {[
-              ["baseProtection", "Bazinė apsauga"],
-              ["bottomInterlayer", "Apatinis perklojimas"],
-              ["rowInterlayer", "Kiekvienos eilės perklojimas"],
-            ].map(([key, label]) => (
-              <div key={key} className="flex items-center gap-2">
-                <Checkbox
-                  id={`${line.id}-${key}`}
-                  checked={line.packaging[key as keyof typeof line.packaging] as boolean}
-                  onCheckedChange={(checked) =>
-                    onChange({
-                      ...line,
-                      packaging: {
-                        ...line.packaging,
-                        [key]: checked === true,
-                      },
-                    })
-                  }
-                />
-                <Label htmlFor={`${line.id}-${key}`} className="font-normal">
-                  {label}
-                </Label>
-              </div>
-            ))}
+          <div className="space-y-1.5">
+            <Label htmlFor="valid-until">Galiojimo pabaiga</Label>
+            <Input
+              id="valid-until"
+              type="date"
+              value={proposal.validUntil}
+              onChange={(event) =>
+                setProposal({ ...proposal, validUntil: event.target.value })
+              }
+              className="bg-paper"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="service-deadline">Paslaugos terminas</Label>
+            <Input
+              id="service-deadline"
+              type="date"
+              value={proposal.serviceDeadline}
+              onChange={(event) =>
+                setProposal({ ...proposal, serviceDeadline: event.target.value })
+              }
+              className="bg-paper"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="client">Klientas</Label>
+            <Input
+              id="client"
+              value={proposal.client}
+              onChange={(event) =>
+                setProposal({ ...proposal, client: event.target.value })
+              }
+              placeholder="Įveskite kliento pavadinimą"
+              aria-invalid={!proposal.client.trim()}
+              className="bg-paper"
+            />
+          </div>
+          <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor="object">Objektas</Label>
+            <Input
+              id="object"
+              value={proposal.object}
+              onChange={(event) =>
+                setProposal({ ...proposal, object: event.target.value })
+              }
+              placeholder="Įveskite objekto pavadinimą"
+              aria-invalid={!proposal.object.trim()}
+              className="bg-paper"
+            />
+          </div>
+          <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor="comment">Komentaras</Label>
+            <Textarea
+              id="comment"
+              value={proposal.comment}
+              onChange={(event) =>
+                setProposal({ ...proposal, comment: event.target.value })
+              }
+              placeholder="Bendras pasiūlymo komentaras klientui"
+              rows={3}
+              className="bg-paper"
+            />
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </section>
+
+      <PromptCorrectionBox onApply={onPromptApply} messages={promptMessages} />
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-serif text-lg font-semibold">Pasiūlymo eilutės</h2>
+            <p className="text-sm text-muted-foreground">
+              Pagrindinėje eilutėje tik plytelė, pjūvis, kiekis ir kaina.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="border-stone-line bg-paper"
+            onClick={() =>
+              setProposal({
+                ...proposal,
+                tileLines: [...proposal.tileLines, createEmptyTileLine()],
+              })
+            }
+          >
+            + Pridėti eilutę
+          </Button>
+        </div>
+
+        {proposal.tileLines.map((line, index) => (
+          <TileLineEditor
+            key={line.id}
+            line={line}
+            index={index}
+            onChange={(next) => updateLine(index, next)}
+            onRemove={() =>
+              setProposal({
+                ...proposal,
+                tileLines: proposal.tileLines.filter((_, idx) => idx !== index),
+              })
+            }
+            canRemove={proposal.tileLines.length > 1}
+          />
+        ))}
+      </section>
+
+      {formError || validationErrors.length > 0 ? (
+        <Alert variant="destructive">
+          <AlertTitle>Patikrinkite formą</AlertTitle>
+          <AlertDescription>
+            {formError ?? validationErrors.join(" ")}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {pdfState === "error" && pdfError ? (
+        <Alert variant="destructive">
+          <AlertTitle>PDF klaida</AlertTitle>
+          <AlertDescription>{pdfError}</AlertDescription>
+        </Alert>
+      ) : null}
+    </div>
   );
 }
 
@@ -283,6 +485,16 @@ export function ProposalCreator() {
   const [formError, setFormError] = useState<string | null>(null);
   const [pdfState, setPdfState] = useState<"idle" | "loading" | "error">("idle");
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [mobileTab, setMobileTab] = useState<"edit" | "doc">("edit");
+  const [isMobileLayout, setIsMobileLayout] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1279px)");
+    const update = () => setIsMobileLayout(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   const validationErrors = useMemo(() => validateProposal(proposal), [proposal]);
 
@@ -320,185 +532,87 @@ export function ProposalCreator() {
     setProposal(result.proposal);
     setPromptMessages(result.messages);
     setFormError(null);
+    setMobileTab("doc");
   };
 
   return (
-    <div className="min-h-screen bg-muted/20">
-      <header className="border-b bg-background">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 md:flex-row md:items-center md:justify-between">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-stone-line bg-[#1c1917] text-[#faf8f4]">
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-5 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div>
-            <p className="text-xs uppercase tracking-wide text-red-700">Deisida</p>
-            <h1 className="text-2xl font-semibold">Pasiūlymo kūrimas</h1>
-            <p className="text-sm text-muted-foreground">
-              Kurkite kliento PDF su storiu, pakavimo pasirinkimais ir vietinėmis
-              pataisomis.
+            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-[#d8cfc0]">
+              Deisida · pardavimo įrankis
+            </p>
+            <h1 className="mt-1 font-serif text-3xl font-semibold tracking-tight">
+              Pasiūlymo kūrimas
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-[#d8cfc0]">
+              Kurkite kliento pasiūlymą kaip tikrą komercinį dokumentą — aiški
+              pagrindinė eilutė ir techninė informacija šalia.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"
+              className="border-[#57534e] bg-transparent text-[#faf8f4] hover:bg-[#292524] hover:text-white"
               onClick={() => setProposal(createDefaultProposal())}
             >
               Naujas pasiūlymas
             </Button>
-            <Button type="button" onClick={handleDownloadPdf} disabled={pdfState === "loading"}>
+            <Button
+              type="button"
+              className="bg-deisida text-deisida-foreground hover:bg-deisida/90"
+              onClick={handleDownloadPdf}
+              disabled={pdfState === "loading"}
+            >
               {pdfState === "loading" ? "Generuojama…" : "Atsisiųsti PDF"}
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <section className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Pasiūlymo informacija</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="number">Pasiūlymo numeris</Label>
-                <Input
-                  id="number"
-                  value={proposal.number}
-                  onChange={(event) =>
-                    setProposal({ ...proposal, number: event.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="valid-until">Pasiūlymo galiojimo pabaiga</Label>
-                <Input
-                  id="valid-until"
-                  type="date"
-                  value={proposal.validUntil}
-                  onChange={(event) =>
-                    setProposal({ ...proposal, validUntil: event.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="service-deadline">Paslaugos atlikimo terminas</Label>
-                <Input
-                  id="service-deadline"
-                  type="date"
-                  value={proposal.serviceDeadline}
-                  onChange={(event) =>
-                    setProposal({ ...proposal, serviceDeadline: event.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="client">Klientas</Label>
-                <Input
-                  id="client"
-                  value={proposal.client}
-                  onChange={(event) =>
-                    setProposal({ ...proposal, client: event.target.value })
-                  }
-                  placeholder="Įveskite kliento pavadinimą"
-                  aria-invalid={!proposal.client.trim()}
-                  required
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="object">Objektas</Label>
-                <Input
-                  id="object"
-                  value={proposal.object}
-                  onChange={(event) =>
-                    setProposal({ ...proposal, object: event.target.value })
-                  }
-                  placeholder="Įveskite objekto pavadinimą"
-                  aria-invalid={!proposal.object.trim()}
-                  required
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="comment">Komentaras</Label>
-                <Textarea
-                  id="comment"
-                  value={proposal.comment}
-                  onChange={(event) =>
-                    setProposal({ ...proposal, comment: event.target.value })
-                  }
-                  placeholder="Bendras pasiūlymo komentaras"
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
+      <main className="mx-auto max-w-[1400px] px-4 py-6 lg:px-8">
+        <div className="mb-4 xl:hidden">
+          <Tabs
+            value={mobileTab}
+            onValueChange={(value) => setMobileTab(value as "edit" | "doc")}
+          >
+            <TabsList className="grid w-full grid-cols-2 bg-[#ebe4d8]">
+              <TabsTrigger value="edit">Redaguoti</TabsTrigger>
+              <TabsTrigger value="doc">Dokumentas</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
-          <PromptCorrectionBox onApply={handlePromptApply} messages={promptMessages} />
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold">Plytelių eilutės</h2>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setProposal({
-                    ...proposal,
-                    tileLines: [...proposal.tileLines, createEmptyTileLine()],
-                  })
-                }
-              >
-                + Pridėti eilutę
-              </Button>
-            </div>
-
-            {proposal.tileLines.length === 0 ? (
-              <Alert>
-                <AlertTitle>Nėra eilučių</AlertTitle>
-                <AlertDescription>
-                  Pridėkite bent vieną plytelių eilutę, kad suformuotumėte pasiūlymą.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              proposal.tileLines.map((line, index) => (
-                <TileLineForm
-                  key={line.id}
-                  line={line}
-                  index={index}
-                  onChange={(next) => updateLine(index, next)}
-                  onRemove={() =>
-                    setProposal({
-                      ...proposal,
-                      tileLines: proposal.tileLines.filter((_, idx) => idx !== index),
-                    })
-                  }
-                  canRemove={proposal.tileLines.length > 1}
-                />
-              ))
-            )}
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.95fr)]">
+          <div className={mobileTab === "doc" ? "hidden xl:block" : "block"}>
+            <EditorPanel
+              proposal={proposal}
+              setProposal={setProposal}
+              promptMessages={promptMessages}
+              onPromptApply={handlePromptApply}
+              formError={formError}
+              validationErrors={validationErrors}
+              pdfState={pdfState}
+              pdfError={pdfError}
+              updateLine={updateLine}
+            />
           </div>
-
-          {formError || validationErrors.length > 0 ? (
-            <Alert variant="destructive">
-              <AlertTitle>Patikrinkite formą</AlertTitle>
-              <AlertDescription>
-                {formError ?? validationErrors.join(" ")}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-
-          {pdfState === "error" && pdfError ? (
-            <Alert variant="destructive">
-              <AlertTitle>PDF klaida</AlertTitle>
-              <AlertDescription>{pdfError}</AlertDescription>
-            </Alert>
-          ) : null}
-        </section>
-
-        <section className="xl:sticky xl:top-4 xl:self-start">
-          <ProposalPreview
-            proposal={proposal}
-            loading={pdfState === "loading"}
-            error={pdfState === "error" ? pdfError : null}
-          />
-        </section>
+          <div
+            className={`${mobileTab === "edit" ? "hidden xl:block" : "block"} xl:sticky xl:top-6 xl:self-start`}
+          >
+            <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Dokumento peržiūra · A4
+            </p>
+            <ProposalPreview
+              proposal={proposal}
+              loading={pdfState === "loading"}
+              error={pdfState === "error" ? pdfError : null}
+              compact={isMobileLayout && mobileTab === "doc"}
+            />
+          </div>
+        </div>
       </main>
     </div>
   );

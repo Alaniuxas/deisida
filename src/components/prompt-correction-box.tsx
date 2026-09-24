@@ -3,7 +3,17 @@
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
 interface PromptCorrectionBoxProps {
@@ -18,17 +28,13 @@ export function PromptCorrectionBox({
   const [prompt, setPrompt] = useState("");
 
   return (
-    <div
-      id="pataisos"
-      className="scroll-mt-24 space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-4"
-    >
-      <div>
-        <h3 className="text-sm font-semibold">Pataisos pagal užklausą</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Įveskite pataisą žemiau. Pataisymai taikomi vietoje, be debesies modelio.
-          Galite naudoti komandas (pvz. „klientas: UAB Statyba“, „storis: 25“,
-          „pakuoti tik neskilusi: taip“, „paslėpti storis“) arba laisvą tekstą kaip
-          papildomą sąlygą.
+    <section id="pataisos" className="editor-panel scroll-mt-24 p-5">
+      <div className="mb-4">
+        <h2 className="font-serif text-lg font-semibold">Pataisos pagal užklausą</h2>
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          Pataisymai taikomi vietoje, be debesies modelio. Naudokite komandas
+          („klientas: UAB Statyba“, „pakeisk klientą į UAB Kauno Statyba“,
+          „storis: 25“) arba laisvą tekstą kaip papildomą sąlygą.
         </p>
       </div>
 
@@ -39,12 +45,14 @@ export function PromptCorrectionBox({
         id="prompt-correction"
         value={prompt}
         onChange={(event) => setPrompt(event.target.value)}
-        placeholder="Pvz.: klientas: UAB Statyba · storis: 25 · pakuoti tik neskilusi: taip · Pridedame papildomą garantiją 12 mėn."
-        rows={4}
+        placeholder="Pvz.: pakeisk klientą į UAB Kauno Statyba · storis: 25 · Pridedame papildomą garantiją 12 mėn."
+        rows={3}
+        className="min-h-24 bg-paper"
       />
 
       <Button
         type="button"
+        className="mt-3 bg-deisida text-deisida-foreground hover:bg-deisida/90"
         onClick={() => {
           onApply(prompt);
           setPrompt("");
@@ -55,7 +63,7 @@ export function PromptCorrectionBox({
       </Button>
 
       {messages.length > 0 ? (
-        <Alert>
+        <Alert className="mt-4 border-stone-line bg-[#faf7f2]">
           <AlertTitle>Vietinis rezultatas</AlertTitle>
           <AlertDescription>
             <ul className="list-disc space-y-1 pl-4">
@@ -66,6 +74,6 @@ export function PromptCorrectionBox({
           </AlertDescription>
         </Alert>
       ) : null}
-    </div>
+    </section>
   );
 }

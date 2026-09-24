@@ -29,6 +29,7 @@ export interface PackagingOptions {
 export interface TileLine {
   id: string;
   tileId: string;
+  pjovimas: string;
   quantityPallets: number;
   storisMm: number;
   showStoris: boolean;
@@ -52,6 +53,16 @@ export interface PromptResult {
   messages: string[];
   appliedLocally: boolean;
 }
+
+export const PJUVIS_OPTIONS = [
+  "Pjovimas plytelėmis",
+  "Pjovimas L kampu",
+  "Atpjovimas nuo L kampo likučio",
+  "Horizontalus kampas",
+  "Kita",
+] as const;
+
+export type PjovimasOption = (typeof PJUVIS_OPTIONS)[number];
 
 export const defaultPackaging = (): PackagingOptions => ({
   packOnlyIntact: null,

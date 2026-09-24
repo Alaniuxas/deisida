@@ -81,20 +81,20 @@ export function applyPromptCorrection(
     matched = true;
   }
 
-  const clientMatch = trimmed.match(
-    /(?:keisti\s+klient[aą]|klientas)\s*[:\-]?\s*(.+)$/i,
-  );
+  const clientMatch =
+    trimmed.match(/(?:keisti\s+klient[aą]|klientas)\s*[:\-]?\s*(.+)$/i) ??
+    trimmed.match(/pakeisk\s+klient[aą]\s+[įi]\s+(.+)$/i);
   if (clientMatch?.[1]) {
-    next.client = clientMatch[1].trim();
+    next.client = clientMatch[1].trim().replace(/^["']|["']$/g, "");
     messages.push(`Klientas pakeistas į „${next.client}“.`);
     matched = true;
   }
 
-  const objectMatch = trimmed.match(
-    /(?:keisti\s+objekt[aą]|objektas)\s*[:\-]?\s*(.+)$/i,
-  );
+  const objectMatch =
+    trimmed.match(/(?:keisti\s+objekt[aą]|objektas)\s*[:\-]?\s*(.+)$/i) ??
+    trimmed.match(/pakeisk\s+objekt[aą]\s+[įi]\s+(.+)$/i);
   if (objectMatch?.[1]) {
-    next.object = objectMatch[1].trim();
+    next.object = objectMatch[1].trim().replace(/^["']|["']$/g, "");
     messages.push(`Objektas pakeistas į „${next.object}“.`);
     matched = true;
   }
