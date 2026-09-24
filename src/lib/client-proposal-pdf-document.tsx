@@ -15,8 +15,8 @@ import {
   formatLineStoris,
   formatLtDate,
   formatLineQuantity,
+  formatLinePriceCell,
   getLineSubtotal,
-  getLineUnitPrice,
   getProposalPricing,
 } from "@/lib/proposal-utils";
 import { getTileById } from "@/lib/tiles";
@@ -284,7 +284,7 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
               <Text style={[styles.th, styles.cellRight]}>Kiekis</Text>
             </View>
             <View style={styles.colUnit}>
-              <Text style={[styles.th, styles.cellRight]}>Kaina už vnt.</Text>
+              <Text style={[styles.th, styles.cellRight]}>Kaina</Text>
             </View>
             <View style={styles.colSum}>
               <Text style={[styles.th, styles.cellRight]}>Suma</Text>
@@ -314,7 +314,7 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
                 </View>
                 <View style={styles.colUnit}>
                   <Text style={[styles.td, styles.cellRight]}>
-                    {formatCatalogPrice(getLineUnitPrice(line))}
+                    {formatLinePriceCell(line)}
                   </Text>
                 </View>
                 <View style={styles.colSum}>

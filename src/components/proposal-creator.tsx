@@ -8,7 +8,9 @@ import {
   createEmptyTileLine,
   formatCatalogPrice,
   formatLineStoris,
-  getLineCatalogPrice,
+  formatLinePriceCell,
+  getLineUnitPrice,
+  lineUnitPriceLabel,
   quantityUnitLabel,
   validateProposal,
 } from "@/lib/proposal-utils";
@@ -276,11 +278,11 @@ function TileLineEditor({
           </div>
         </FormField>
 
-        <FormField label="Kaina už vnt.">
+        <FormField label={lineUnitPriceLabel(line.quantityUnit)}>
           <div
             className={`flex ${controlClass} items-center rounded-md border border-stone-line bg-[#f3f3f0] px-3 text-sm font-medium tabular-nums`}
           >
-            {formatCatalogPrice(getLineCatalogPrice(line))}
+            {formatCatalogPrice(getLineUnitPrice(line))}
           </div>
         </FormField>
       </div>

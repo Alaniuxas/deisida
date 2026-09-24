@@ -119,6 +119,36 @@ export function getLineCatalogPrice(line: TileLine): number {
   return getTileById(line.tileId)?.priceEur ?? 0;
 }
 
+export function lineUnitPriceLabel(unit: QuantityUnit): string {
+  return unit === "pieces" ? "Kaina už vnt." : "Kaina už paletę";
+}
+
+export function getLineUnitPrice(line: TileLine): number {
+  const tile = getTileById(line.tileId);
+  const palletPrice = tile?.priceEur ?? 0;
+  if (palletPrice <= 0) return 0;
+
+  if (line.quantityUnit === "pallets") {
+    return palletPrice;
+  }
+
+  const piecesPerPallet = tile?.quantityPerPallet ?? 0;
+  if (piecesPerPallet <= 0) return 0;
+
+  return palletPrice / piecesPerPallet;
+}
+
+export function getLineSubtotal(line: TileLine): number {
+  return line.quantity * getLineUnitPrice(line);
+}
+
+export function formatLinePriceCell(line: TileLine): string {
+  const unitPrice = getLineUnitPrice(line);
+  if (unitPrice <= 0) return "—";
+  const suffix = line.quantityUnit === "pieces" ? "/ vnt." : "/ paletė";
+  return `${formatCatalogPrice(unitPrice)} ${suffix}`;
+}
+
 export function getLineStorisMm(line: TileLine): number {
   return getTileById(line.tileId)?.heightMm ?? 0;
 }
@@ -155,14 +185,6 @@ export function formatLineQuantity(line: TileLine): string {
 
 export function quantityUnitLabel(unit: QuantityUnit): string {
   return unit === "pieces" ? "vnt." : "paletės";
-}
-
-export function getLineUnitPrice(line: TileLine): number {
-  return getLineCatalogPrice(line);
-}
-
-export function getLineSubtotal(line: TileLine): number {
-  return getLinePieceCount(line) * getLineUnitPrice(line);
 }
 
 export interface ProposalPricing {
