@@ -34,6 +34,8 @@ async function main() {
   });
 
   await waitForApp(page);
+  await page.setViewportSize({ width: 1800, height: 1100 });
+  await page.reload({ waitUntil: "networkidle" });
   await page.locator("#client").fill("UAB Statybos partneriai");
   await page.locator("#object").fill("Vilniaus g. 12, Kaunas");
   await page.locator("#comment").fill("komentaras klientui");

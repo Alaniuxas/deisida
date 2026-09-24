@@ -96,7 +96,7 @@ export function ClientProposalPreview({
       <section className="mb-6">
         <h2 className="mb-3 text-base font-semibold text-deisida-muted">Pasiūlymas</h2>
         <div className="overflow-x-auto rounded-md border border-stone-line">
-          <table className="min-w-full table-fixed border-collapse">
+          <table className="min-w-[640px] w-full table-fixed border-collapse">
             <colgroup>
               <col className="w-[20%]" />
               <col className="w-[17%]" />
@@ -113,7 +113,7 @@ export function ClientProposalPreview({
                   Pjovimo storis
                 </th>
                 <th className="px-3 py-2.5 text-right font-semibold leading-tight">Kiekis</th>
-                <th className="whitespace-normal px-3 py-2.5 text-right font-semibold leading-tight">
+                <th className="px-3 py-2.5 text-right font-semibold leading-tight whitespace-nowrap">
                   Kaina už vnt.
                 </th>
                 <th className="px-3 py-2.5 text-right font-semibold leading-tight">Suma</th>
