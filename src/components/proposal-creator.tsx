@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Proposal, QuantityUnit, TileLine } from "@/lib/types";
 import { PJUVIS_OPTIONS } from "@/lib/types";
 import {
@@ -134,7 +134,7 @@ function TileLineEditor({
   const tileLabel = tile?.name ?? null;
 
   return (
-    <div className="border-b border-stone-line last:border-b-0">
+    <div id={`tile-line-${index}`} className="border-b border-stone-line last:border-b-0">
       <div className="flex items-center justify-between bg-[#f3f3f0] px-6 py-3 lg:px-10">
         <h3 className="text-sm font-semibold text-deisida-muted">Eilutė {index + 1}</h3>
         {canRemove ? (
@@ -414,6 +414,7 @@ export function ProposalCreator() {
   const [mobileTab, setMobileTab] = useState<MobileTab>("edit");
   const [previewDoc, setPreviewDoc] = useState<PreviewDoc>("client");
   const [isMobileLayout, setIsMobileLayout] = useState(false);
+  const pendingScrollLineIndex = useRef<number | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1279px)");
@@ -429,7 +430,33 @@ export function ProposalCreator() {
     return () => window.clearTimeout(timer);
   }, [downloadNote]);
 
+  useEffect(() => {
+    if (pendingScrollLineIndex.current === null) return;
+    const index = pendingScrollLineIndex.current;
+    pendingScrollLineIndex.current = null;
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`tile-line-${index}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [proposal.tileLines.length]);
+
   const validationErrors = useMemo(() => validateProposal(proposal), [proposal]);
+
+  const addTileLine = () => {
+    setProposal((current) => {
+      const tileLines = [...current.tileLines, createEmptyTileLine()];
+      pendingScrollLineIndex.current = tileLines.length - 1;
+      return { ...current, tileLines };
+    });
+  };
+
+  const removeTileLine = (index: number) => {
+    setProposal((current) => ({
+      ...current,
+      tileLines: current.tileLines.filter((_, idx) => idx !== index),
+    }));
+  };
 
   const updateLine = (index: number, line: TileLine) => {
     setProposal((current) => ({
@@ -471,7 +498,7 @@ export function ProposalCreator() {
     mobileTab === "production" || (!isMobileLayout && previewDoc === "production");
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
       <header className="border-b border-stone-line bg-white">
         <div className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-end lg:justify-between lg:px-10">
           <div>
@@ -519,9 +546,11 @@ export function ProposalCreator() {
         </Tabs>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden xl:flex-row">
         <div
-          className={`min-w-0 flex-1 ${showEditor ? "block" : "hidden xl:block"} xl:overflow-y-auto`}
+          className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${
+            showEditor ? "block" : "hidden xl:block"
+          }`}
         >
           <section className="border-b border-stone-line bg-white px-6 py-8 lg:px-10">
             <h2 className="mb-6 text-lg font-semibold text-deisida-muted">
@@ -598,19 +627,14 @@ export function ProposalCreator() {
             </div>
           </section>
 
-          <section className="bg-white">
+          <section className="bg-white" data-tile-lines-section>
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-line px-6 py-6 lg:px-10">
               <h2 className="text-lg font-semibold text-deisida-muted">Plytelės</h2>
               <Button
                 type="button"
                 variant="outline"
                 className="h-10 border-stone-line bg-paper"
-                onClick={() =>
-                  setProposal({
-                    ...proposal,
-                    tileLines: [...proposal.tileLines, createEmptyTileLine()],
-                  })
-                }
+                onClick={addTileLine}
               >
                 Pridėti eilutę
               </Button>
@@ -622,12 +646,7 @@ export function ProposalCreator() {
                 line={line}
                 index={index}
                 onChange={(next) => updateLine(index, next)}
-                onRemove={() =>
-                  setProposal({
-                    ...proposal,
-                    tileLines: proposal.tileLines.filter((_, idx) => idx !== index),
-                  })
-                }
+                onRemove={() => removeTileLine(index)}
                 canRemove={proposal.tileLines.length > 1}
               />
             ))}
@@ -654,9 +673,9 @@ export function ProposalCreator() {
         </div>
 
         <aside
-          className={`border-stone-line bg-[#f3f3f0] xl:w-[min(520px,42vw)] xl:border-l ${
+          className={`min-h-0 flex-col overflow-hidden border-stone-line bg-[#f3f3f0] xl:w-[min(520px,42vw)] xl:flex-shrink-0 xl:border-l ${
             mobileTab === "edit" ? "hidden xl:flex" : "flex"
-          } min-h-0 flex-col`}
+          }`}
         >
           <div className="flex items-center justify-between border-b border-stone-line px-6 py-4 lg:px-8">
             <h2 className="text-lg font-semibold text-deisida-muted">Peržiūra</h2>
