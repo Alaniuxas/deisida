@@ -1,7 +1,6 @@
 import React from "react";
 import {
   Document,
-  Font,
   Page,
   StyleSheet,
   Text,
@@ -19,14 +18,9 @@ import {
   formatYesNo,
 } from "@/lib/proposal-utils";
 import { getTileById } from "@/lib/tiles";
+import { PDF_FONT_FAMILY, registerPdfFonts } from "@/lib/pdf-fonts";
 
-Font.register({
-  family: "Helvetica",
-  fonts: [
-    { src: "Helvetica" },
-    { src: "Helvetica-Bold", fontWeight: "bold" },
-  ],
-});
+registerPdfFonts();
 
 const brand = {
   red: "#c14546",
@@ -44,9 +38,9 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     paddingHorizontal: 40,
     fontSize: 9,
-    fontFamily: "Helvetica",
+    fontFamily: PDF_FONT_FAMILY,
     color: brand.ink,
-    lineHeight: 1.4,
+    lineHeight: 1.45,
     backgroundColor: brand.paper,
   },
   hero: {
@@ -82,18 +76,19 @@ const styles = StyleSheet.create({
     borderBottom: "none",
   },
   detailLabel: {
-    width: 92,
+    width: 96,
     paddingRight: 8,
     fontSize: 7,
     color: brand.muted,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
     fontWeight: "bold",
+    flexShrink: 0,
   },
   detailValue: {
     flex: 1,
     fontSize: 9.5,
     color: brand.ink,
+    lineHeight: 1.4,
   },
   lineBlock: {
     marginBottom: 12,
@@ -128,13 +123,13 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: "bold",
     color: brand.gray,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
     marginBottom: 8,
   },
   orderLine: {
     fontSize: 8,
-    marginBottom: 2,
+    marginBottom: 4,
+    lineHeight: 1.45,
   },
   noteBox: {
     marginTop: 10,
@@ -144,8 +139,7 @@ const styles = StyleSheet.create({
   noteTitle: {
     fontSize: 7,
     color: brand.red,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
     marginBottom: 4,
     fontWeight: "bold",
   },
@@ -180,7 +174,9 @@ function DetailRow({
   return (
     <View style={[styles.detailRow, last ? styles.detailRowLast : undefined]}>
       <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
+      <Text style={styles.detailValue} wrap>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -241,15 +237,17 @@ export function ProductionProposalDocument({ proposal }: { proposal: Proposal })
 
         <View style={styles.orderBlock}>
           <Text style={styles.orderTitle}>Baras ir pakavimas</Text>
-          <Text style={styles.orderLine}>Baras: {proposal.pjovimas}</Text>
-          <Text style={styles.orderLine}>
+          <Text style={styles.orderLine} wrap>
+            Baras: {proposal.pjovimas}
+          </Text>
+          <Text style={styles.orderLine} wrap>
             Pakavimas: {formatProductionPackagingSummary(proposal.packaging)}
           </Text>
-          <Text style={styles.orderLine}>
+          <Text style={styles.orderLine} wrap>
             Likučiai: {formatYesNo(proposal.packaging.needLeftovers)}
           </Text>
           {describePackagingChoices(proposal.packaging).map((item) => (
-            <Text key={item} style={styles.orderLine}>
+            <Text key={item} style={styles.orderLine} wrap>
               {item}
             </Text>
           ))}
@@ -257,7 +255,9 @@ export function ProductionProposalDocument({ proposal }: { proposal: Proposal })
 
         <View style={styles.noteBox}>
           <Text style={styles.noteTitle}>L-kampų pastaba</Text>
-          <Text style={styles.noteText}>{L_CORNER_NOTE}</Text>
+          <Text style={styles.noteText} wrap>
+            {L_CORNER_NOTE}
+          </Text>
         </View>
 
         <View style={styles.footer} fixed>

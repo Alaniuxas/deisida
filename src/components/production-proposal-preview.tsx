@@ -12,6 +12,7 @@ import {
   formatYesNo,
 } from "@/lib/proposal-utils";
 import { getTileById } from "@/lib/tiles";
+import { proposalDocumentClass } from "@/lib/proposal-document-styles";
 
 interface ProductionProposalPreviewProps {
   proposal: Proposal;
@@ -26,7 +27,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         {label}
       </dt>
-      <dd className="text-sm leading-snug">{value}</dd>
+      <dd className="break-words text-sm leading-snug">{value}</dd>
     </div>
   );
 }
@@ -58,7 +59,7 @@ export function ProductionProposalPreview({
 
   return (
     <article
-      className={`paper-shadow w-full rounded-lg bg-paper text-ink ${
+      className={`paper-shadow w-full rounded-lg bg-paper ${proposalDocumentClass} ${
         compact ? "p-4 text-[10px]" : "p-6 text-sm xl:p-8"
       }`}
     >
@@ -119,9 +120,11 @@ export function ProductionProposalPreview({
             value={formatYesNo(proposal.packaging.needLeftovers)}
           />
         </dl>
-        <ul className="mt-3 space-y-1 text-xs leading-relaxed text-muted-foreground">
+        <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
           {describePackagingChoices(proposal.packaging).map((item) => (
-            <li key={item}>{item}</li>
+            <li key={item} className="break-words">
+              {item}
+            </li>
           ))}
         </ul>
       </section>
@@ -130,7 +133,7 @@ export function ProductionProposalPreview({
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-deisida">
           L-kampų pastaba
         </p>
-        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-2 break-words text-xs leading-relaxed text-muted-foreground">
           {L_CORNER_NOTE}
         </p>
       </footer>

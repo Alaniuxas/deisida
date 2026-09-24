@@ -14,6 +14,7 @@ import {
   getProposalPricing,
 } from "@/lib/proposal-utils";
 import { getTileById } from "@/lib/tiles";
+import { proposalDocumentClass } from "@/lib/proposal-document-styles";
 
 interface ClientProposalPreviewProps {
   proposal: Proposal;
@@ -52,27 +53,27 @@ export function ClientProposalPreview({
 
   return (
     <article
-      className={`paper-shadow w-full rounded-lg bg-paper text-ink ${
+      className={`paper-shadow w-full rounded-lg bg-paper ${proposalDocumentClass} ${
         compact ? "p-4 text-[10px]" : "p-6 text-sm xl:p-8"
       }`}
     >
-      <header className="mb-6 flex flex-col gap-4 border-b-2 border-deisida pb-5 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+      <header className="mb-6 grid grid-cols-1 gap-4 border-b-2 border-deisida pb-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-8">
+        <div className="min-w-0">
           <p className="text-2xl font-bold tracking-tight text-deisida">DEISIDA</p>
           <p className="mt-1 text-xs text-muted-foreground">Pasiūlymas klientui</p>
         </div>
-        <dl className="grid gap-1 text-xs sm:text-right">
-          <div className="flex gap-2 sm:justify-end">
-            <dt className="text-muted-foreground">Pasiūlymo Nr.</dt>
-            <dd className="font-semibold">{proposal.number}</dd>
+        <dl className="grid shrink-0 gap-1.5 text-xs sm:min-w-[240px] sm:text-right">
+          <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 sm:grid-cols-[1fr_auto] sm:gap-x-4">
+            <dt className="text-muted-foreground sm:text-right">Pasiūlymo Nr.</dt>
+            <dd className="font-semibold sm:text-right">{proposal.number}</dd>
           </div>
-          <div className="flex gap-2 sm:justify-end">
-            <dt className="text-muted-foreground">Galioja iki</dt>
-            <dd>{formatLtDate(proposal.validUntil)}</dd>
+          <div className="grid grid-cols-[auto_1fr] gap-x-3 sm:grid-cols-[1fr_auto] sm:gap-x-4">
+            <dt className="text-muted-foreground sm:text-right">Galioja iki</dt>
+            <dd className="sm:text-right">{formatLtDate(proposal.validUntil)}</dd>
           </div>
-          <div className="flex gap-2 sm:justify-end">
-            <dt className="text-muted-foreground">Paslaugos terminas</dt>
-            <dd>{formatLtDate(proposal.serviceDeadline)}</dd>
+          <div className="grid grid-cols-[auto_1fr] gap-x-3 sm:grid-cols-[1fr_auto] sm:gap-x-4">
+            <dt className="text-muted-foreground sm:text-right">Paslaugos terminas</dt>
+            <dd className="sm:text-right">{formatLtDate(proposal.serviceDeadline)}</dd>
           </div>
         </dl>
       </header>
@@ -95,15 +96,23 @@ export function ClientProposalPreview({
       <section className="mb-6">
         <h2 className="mb-3 text-base font-semibold text-deisida-muted">Pasiūlymas</h2>
         <div className="overflow-x-auto rounded-md border border-stone-line">
-          <table className="min-w-full border-collapse">
+          <table className="min-w-full table-fixed border-collapse">
+            <colgroup>
+              <col className="w-[20%]" />
+              <col className="w-[17%]" />
+              <col className="w-[13%]" />
+              <col className="w-[12%]" />
+              <col className="w-[18%]" />
+              <col className="w-[20%]" />
+            </colgroup>
             <thead>
-              <tr className="border-b border-stone-line bg-[#f3f3f0] text-left text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+              <tr className="border-b border-stone-line bg-[#f3f3f0] text-left text-[11px] text-muted-foreground">
                 <th className="px-3 py-2.5 font-semibold">Plytelė</th>
                 <th className="px-3 py-2.5 font-semibold">Matmenys</th>
-                <th className="px-3 py-2.5 font-semibold">Pjovimo storis</th>
-                <th className="px-3 py-2.5 font-semibold text-right">Kiekis</th>
-                <th className="px-3 py-2.5 font-semibold text-right">Kaina už vnt.</th>
-                <th className="px-3 py-2.5 font-semibold text-right">Suma</th>
+                <th className="px-3 py-2.5 font-semibold leading-snug">Pjovimo storis</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Kiekis</th>
+                <th className="px-3 py-2.5 text-right font-semibold leading-snug">Kaina už vnt.</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Suma</th>
               </tr>
             </thead>
             <tbody>
@@ -111,7 +120,7 @@ export function ClientProposalPreview({
                 const tile = getTileById(line.tileId);
                 return (
                   <tr key={line.id} className="border-b border-stone-line last:border-0">
-                    <td className="px-3 py-3 align-middle font-medium">
+                    <td className="break-words px-3 py-3 align-middle font-medium">
                       {tile?.name ?? "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 align-middle text-xs">
@@ -146,7 +155,9 @@ export function ClientProposalPreview({
           </h3>
           <ul className="space-y-1.5 text-xs leading-relaxed">
             {clientPackaging.map((item) => (
-              <li key={item}>{item}</li>
+              <li key={item} className="break-words">
+                {item}
+              </li>
             ))}
           </ul>
         </section>
@@ -197,7 +208,7 @@ export function ClientProposalPreview({
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-deisida">
           Pastaba
         </p>
-        <p className="mt-2 text-xs leading-relaxed">{L_CORNER_NOTE}</p>
+        <p className="mt-2 break-words text-xs leading-relaxed">{L_CORNER_NOTE}</p>
       </footer>
     </article>
   );

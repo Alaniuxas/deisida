@@ -1,7 +1,6 @@
 import React from "react";
 import {
   Document,
-  Font,
   Page,
   StyleSheet,
   Text,
@@ -21,14 +20,9 @@ import {
   getProposalPricing,
 } from "@/lib/proposal-utils";
 import { getTileById } from "@/lib/tiles";
+import { PDF_FONT_FAMILY, registerPdfFonts } from "@/lib/pdf-fonts";
 
-Font.register({
-  family: "Helvetica",
-  fonts: [
-    { src: "Helvetica" },
-    { src: "Helvetica-Bold", fontWeight: "bold" },
-  ],
-});
+registerPdfFonts();
 
 const brand = {
   red: "#c14546",
@@ -44,17 +38,30 @@ const styles = StyleSheet.create({
   page: {
     padding: 40,
     fontSize: 8.5,
-    fontFamily: "Helvetica",
+    fontFamily: PDF_FONT_FAMILY,
     color: brand.ink,
-    lineHeight: 1.35,
+    lineHeight: 1.4,
     backgroundColor: brand.paper,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 24,
     marginBottom: 16,
     paddingBottom: 12,
     borderBottom: `2pt solid ${brand.red}`,
+  },
+  headerBrand: {
+    flexGrow: 1,
+    flexShrink: 1,
+    maxWidth: "46%",
+  },
+  headerMeta: {
+    flexGrow: 0,
+    flexShrink: 0,
+    width: "50%",
+    minWidth: 190,
   },
   brand: {
     fontSize: 18,
@@ -62,19 +69,29 @@ const styles = StyleSheet.create({
     color: brand.red,
   },
   brandSub: {
-    fontSize: 8,
+    fontSize: 8.5,
     color: brand.muted,
-    marginTop: 2,
+    marginTop: 3,
   },
-  metaBlock: { width: "46%" },
   metaRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginBottom: 2,
-    gap: 6,
+    alignItems: "flex-start",
+    marginBottom: 3,
+    gap: 10,
   },
-  metaLabel: { color: brand.muted },
-  metaValue: { fontWeight: "bold" },
+  metaLabel: {
+    width: 96,
+    textAlign: "right",
+    color: brand.muted,
+    flexShrink: 0,
+  },
+  metaValue: {
+    flexGrow: 1,
+    flexShrink: 1,
+    fontWeight: "bold",
+    textAlign: "right",
+  },
   infoGrid: {
     flexDirection: "row",
     gap: 8,
@@ -89,8 +106,7 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 7,
     color: brand.gray,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
     marginBottom: 3,
     fontWeight: "bold",
   },
@@ -114,22 +130,24 @@ const styles = StyleSheet.create({
     borderBottom: `1pt solid ${brand.line}`,
   },
   th: {
-    padding: 5,
-    fontSize: 6.5,
+    fontSize: 7,
     fontWeight: "bold",
     color: brand.muted,
-    textTransform: "uppercase",
+    lineHeight: 1.35,
   },
   td: {
-    padding: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 4,
     fontSize: 7.5,
+    lineHeight: 1.35,
   },
-  colTile: { width: "20%" },
-  colDim: { width: "20%" },
-  colThick: { width: "12%" },
-  colQty: { width: "16%", textAlign: "right" },
-  colUnit: { width: "14%", textAlign: "right" },
-  colSum: { width: "18%", textAlign: "right" },
+  colTile: { width: "20%", padding: 4 },
+  colDim: { width: "17%", padding: 4 },
+  colThick: { width: "13%", padding: 4 },
+  colQty: { width: "12%", padding: 4, alignItems: "flex-end" },
+  colUnit: { width: "18%", padding: 4, alignItems: "flex-end" },
+  colSum: { width: "20%", padding: 4, alignItems: "flex-end" },
+  cellRight: { textAlign: "right" },
   orderBox: {
     border: `1pt solid ${brand.line}`,
     backgroundColor: brand.panel,
@@ -138,11 +156,12 @@ const styles = StyleSheet.create({
   },
   orderLine: {
     fontSize: 7.5,
-    marginBottom: 2,
+    marginBottom: 4,
+    lineHeight: 1.45,
   },
   totals: {
     alignSelf: "flex-end",
-    width: "38%",
+    width: "42%",
     marginBottom: 12,
   },
   totalRow: {
@@ -169,14 +188,14 @@ const styles = StyleSheet.create({
   commentTitle: {
     fontSize: 7,
     color: brand.gray,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
     marginBottom: 6,
     fontWeight: "bold",
   },
   commentLine: {
     fontSize: 7.5,
     marginBottom: 3,
+    lineHeight: 1.45,
   },
   noteBox: {
     borderTop: `1pt solid ${brand.line}`,
@@ -186,10 +205,12 @@ const styles = StyleSheet.create({
   noteTitle: {
     fontSize: 7,
     color: brand.red,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
     marginBottom: 3,
     fontWeight: "bold",
+  },
+  noteText: {
+    lineHeight: 1.45,
   },
   footer: {
     position: "absolute",
@@ -214,11 +235,11 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
     <Document title={`Pasiūlymas ${proposal.number}`}>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerBrand}>
             <Text style={styles.brand}>DEISIDA</Text>
             <Text style={styles.brandSub}>Pasiūlymas klientui</Text>
           </View>
-          <View style={styles.metaBlock}>
+          <View style={styles.headerMeta}>
             <View style={styles.metaRow}>
               <Text style={styles.metaLabel}>Pasiūlymo Nr.</Text>
               <Text style={styles.metaValue}>{proposal.number}</Text>
@@ -250,35 +271,57 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
         <Text style={styles.sectionTitle}>Pasiūlymas</Text>
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={[styles.th, styles.colTile]}>Plytelė</Text>
-            <Text style={[styles.th, styles.colDim]}>Matmenys</Text>
-            <Text style={[styles.th, styles.colThick]}>Pjovimo storis</Text>
-            <Text style={[styles.th, styles.colQty]}>Kiekis</Text>
-            <Text style={[styles.th, styles.colUnit]}>Kaina už vnt.</Text>
-            <Text style={[styles.th, styles.colSum]}>Suma</Text>
+            <View style={styles.colTile}>
+              <Text style={styles.th}>Plytelė</Text>
+            </View>
+            <View style={styles.colDim}>
+              <Text style={styles.th}>Matmenys</Text>
+            </View>
+            <View style={styles.colThick}>
+              <Text style={styles.th}>Pjovimo storis</Text>
+            </View>
+            <View style={styles.colQty}>
+              <Text style={[styles.th, styles.cellRight]}>Kiekis</Text>
+            </View>
+            <View style={styles.colUnit}>
+              <Text style={[styles.th, styles.cellRight]}>Kaina už vnt.</Text>
+            </View>
+            <View style={styles.colSum}>
+              <Text style={[styles.th, styles.cellRight]}>Suma</Text>
+            </View>
           </View>
           {proposal.tileLines.map((line) => {
             const tile = getTileById(line.tileId);
             return (
               <View key={line.id} style={styles.tableRow}>
-                <Text style={[styles.td, styles.colTile]}>{tile?.name ?? "—"}</Text>
-                <Text style={[styles.td, styles.colDim]}>
-                  {tile
-                    ? formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)
-                    : "—"}
-                </Text>
-                <Text style={[styles.td, styles.colThick]}>
-                  {formatLineStoris(line)}
-                </Text>
-                <Text style={[styles.td, styles.colQty]}>
-                  {formatLineQuantity(line)}
-                </Text>
-                <Text style={[styles.td, styles.colUnit]}>
-                  {formatCatalogPrice(getLineUnitPrice(line))}
-                </Text>
-                <Text style={[styles.td, styles.colSum]}>
-                  {formatCatalogPrice(getLineSubtotal(line))}
-                </Text>
+                <View style={styles.colTile}>
+                  <Text style={styles.td}>{tile?.name ?? "—"}</Text>
+                </View>
+                <View style={styles.colDim}>
+                  <Text style={styles.td}>
+                    {tile
+                      ? formatDimensions(tile.lengthMm, tile.widthMm, tile.heightMm)
+                      : "—"}
+                  </Text>
+                </View>
+                <View style={styles.colThick}>
+                  <Text style={styles.td}>{formatLineStoris(line)}</Text>
+                </View>
+                <View style={styles.colQty}>
+                  <Text style={[styles.td, styles.cellRight]}>
+                    {formatLineQuantity(line)}
+                  </Text>
+                </View>
+                <View style={styles.colUnit}>
+                  <Text style={[styles.td, styles.cellRight]}>
+                    {formatCatalogPrice(getLineUnitPrice(line))}
+                  </Text>
+                </View>
+                <View style={styles.colSum}>
+                  <Text style={[styles.td, styles.cellRight]}>
+                    {formatCatalogPrice(getLineSubtotal(line))}
+                  </Text>
+                </View>
               </View>
             );
           })}
@@ -288,7 +331,7 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
           <View style={styles.orderBox}>
             <Text style={styles.commentTitle}>Pakavimas</Text>
             {clientPackaging.map((item) => (
-              <Text key={item} style={styles.orderLine}>
+              <Text key={item} style={styles.orderLine} wrap>
                 {item}
               </Text>
             ))}
@@ -316,12 +359,12 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
           <View style={styles.commentBox}>
             <Text style={styles.commentTitle}>Komentarai</Text>
             {proposal.comment ? (
-              <Text style={styles.commentLine}>
+              <Text style={styles.commentLine} wrap>
                 Bendras komentaras: {proposal.comment}
               </Text>
             ) : null}
             {proposal.extraClauses.map((clause, index) => (
-              <Text key={`${clause}-${index}`} style={styles.commentLine}>
+              <Text key={`${clause}-${index}`} style={styles.commentLine} wrap>
                 Papildoma sąlyga: {clause}
               </Text>
             ))}
@@ -330,7 +373,9 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
 
         <View style={styles.noteBox}>
           <Text style={styles.noteTitle}>Pastaba</Text>
-          <Text>{L_CORNER_NOTE}</Text>
+          <Text style={styles.noteText} wrap>
+            {L_CORNER_NOTE}
+          </Text>
         </View>
 
         <View style={styles.footer} fixed>
