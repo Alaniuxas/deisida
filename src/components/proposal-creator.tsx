@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Proposal, TileLine } from "@/lib/types";
+import type { Proposal, QuantityUnit, TileLine } from "@/lib/types";
 import { PJUVIS_OPTIONS } from "@/lib/types";
 import { applyPromptCorrection } from "@/lib/prompt-corrections";
 import {
@@ -9,8 +9,9 @@ import {
   createEmptyTileLine,
   formatCatalogPrice,
   formatDimensions,
-  formatPieceQuantity,
+  formatLineQuantity,
   getLineCatalogPrice,
+  quantityUnitLabel,
   validateProposal,
 } from "@/lib/proposal-utils";
 import { TILE_CATALOG } from "@/lib/tiles";
@@ -161,35 +162,48 @@ function TileLineEditor({
             htmlFor={`quantity-${line.id}`}
             className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground"
           >
-            Kiekis (pal.)
+            Kiekis
           </Label>
           <div className="flex items-center gap-2">
             <Input
               id={`quantity-${line.id}`}
               type="number"
               min={0}
-              step={0.5}
-              value={line.quantityPallets}
+              step={line.quantityUnit === "pieces" ? 1 : 0.5}
+              value={line.quantity}
               onChange={(event) =>
                 onChange({
                   ...line,
-                  quantityPallets: Number(event.target.value),
+                  quantity: Number(event.target.value),
                 })
               }
               className="bg-paper tabular-nums"
             />
-            <span className="text-xs text-muted-foreground">pal.</span>
+            <div className="flex shrink-0 overflow-hidden rounded-md border border-stone-line">
+              {(["pieces", "pallets"] as QuantityUnit[]).map((unit) => (
+                <button
+                  key={unit}
+                  type="button"
+                  className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    line.quantityUnit === unit
+                      ? "bg-deisida text-deisida-foreground"
+                      : "bg-paper text-muted-foreground hover:bg-[#f3f3f0]"
+                  }`}
+                  onClick={() => onChange({ ...line, quantityUnit: unit })}
+                >
+                  {quantityUnitLabel(unit)}
+                </button>
+              ))}
+            </div>
           </div>
-          {tile ? (
-            <p className="text-[11px] text-muted-foreground">
-              ≈ {formatPieceQuantity(line)}
-            </p>
-          ) : null}
+          <p className="text-[11px] text-muted-foreground">
+            Dokumente: {formatLineQuantity(line)}
+          </p>
         </div>
 
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-            Vnt. kaina
+            Kaina už vnt.
           </Label>
           <div className="flex h-8 items-center rounded-md border border-stone-line bg-[#f3f3f0] px-3 text-sm font-medium tabular-nums">
             {formatCatalogPrice(getLineCatalogPrice(line))}
@@ -318,7 +332,7 @@ function TileLineEditor({
             onChange={(event) =>
               onChange({ ...line, comment: event.target.value })
             }
-            placeholder="Techninė pastaba gamybai"
+            placeholder="Pastaba gamybai"
             rows={2}
             className="bg-paper"
           />
@@ -416,14 +430,14 @@ function EditorPanel({
             />
           </div>
           <div className="space-y-1.5 md:col-span-2">
-            <Label htmlFor="comment">Komentaras klientui</Label>
+            <Label htmlFor="comment">Pastaba klientui</Label>
             <Textarea
               id="comment"
               value={proposal.comment}
               onChange={(event) =>
                 setProposal({ ...proposal, comment: event.target.value })
               }
-              placeholder="Bendras pasiūlymo komentaras (atskirame bloke PDF)"
+              placeholder="Jei reikia, parašykite pastabą klientui"
               rows={3}
               className="bg-paper"
             />
@@ -438,7 +452,7 @@ function EditorPanel({
           <div>
             <h2 className="text-lg font-semibold text-deisida-muted">Pasiūlymo eilutės</h2>
             <p className="text-sm text-muted-foreground">
-              Kliento PDF — kaina ir kiekis vnt.; gamybos PDF — operacinė informacija.
+              Klientui rodoma kaina ir kiekis. Gamybai — darbo informacija.
             </p>
           </div>
           <Button
@@ -485,7 +499,7 @@ function EditorPanel({
 
       {pdfState === "error" && pdfError ? (
         <Alert variant="destructive">
-          <AlertTitle>PDF klaida</AlertTitle>
+          <AlertTitle>Nepavyko paruošti failo</AlertTitle>
           <AlertDescription>{pdfError}</AlertDescription>
         </Alert>
       ) : null}
@@ -572,8 +586,7 @@ export function ProposalCreator() {
               Pasiūlymo kūrimas
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Vienas užsakymas — du dokumentai: komercinis pasiūlymas klientui ir
-              gamybos užduotis cechui.
+              Vienas užsakymas — du dokumentai: klientui ir gamybai.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -592,7 +605,7 @@ export function ProposalCreator() {
               onClick={() => handleDownloadPdf("production")}
               disabled={pdfState === "loading"}
             >
-              Gamybos PDF
+              Gamybai
             </Button>
             <Button
               type="button"
@@ -600,7 +613,7 @@ export function ProposalCreator() {
               onClick={() => handleDownloadPdf("client")}
               disabled={pdfState === "loading"}
             >
-              {pdfState === "loading" ? "Generuojama…" : "Pasiūlymo PDF"}
+              {pdfState === "loading" ? "Palaukite…" : "Klientui"}
             </Button>
           </div>
         </div>
@@ -639,7 +652,7 @@ export function ProposalCreator() {
           >
             <div className="mb-3 hidden items-center justify-between gap-3 xl:flex">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Dokumento peržiūra · A4
+                Peržiūra
               </p>
               <Tabs
                 value={previewDoc}

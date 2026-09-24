@@ -15,14 +15,15 @@ Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127`.
 
 ## App status (2026-09-24)
 
-- Redesigned quote UI: warm stone palette, DM Sans + Source Serif 4, charcoal header
-- Main document lines show only **plytelė · pjūvis · kiekis · kaina** (catalog price)
-- Storis, packaging, specs, comments, L-kampų note in side appendix (editor + PDF)
-- Mobile tabs: **Redaguoti** / **Dokumentas** (preview always reachable)
+- UI aligned with **deisida.lt**: DM Sans, `#c14546` accent, `#484849` / `#282829` text, `#F3F3F0` surfaces — no cream/serif landing look
+- **Two PDFs** from one proposal:
+  - **Pasiūlymo PDF** (klientui): plytelė, baras, matmenys, pjovimo storis, kiekis vnt. (pal. pagalbinė info), vnt. kaina, suma, PVM 21 %; komentarai atskirame bloke
+  - **Gamybos PDF** (cechui): operacinė info — diskas, pakavimas, likučiai, gamybos komentarai; be kainų
+- Peržiūra: **Klientui** / **Gamyba** (desktop tabs + mobile)
 - Local prompt corrections incl. `pakeisk klientą į …` and freeform clauses
 - Seeded tile catalog (4 example tiles)
 - Dev fix: `allowedDevOrigins` in `next.config.ts`
 
-Screenshots: `/cursor/stores/self/media/proposal-redesign/`
+Screenshots: `/cursor/stores/self/media/proposal-brand/`
 
 Do not deploy without asking Alanas.

@@ -6,7 +6,7 @@ import {
   formatCatalogPrice,
   formatDimensions,
   formatLtDate,
-  formatPieceQuantity,
+  formatLineQuantity,
   getLineSubtotal,
   getLineUnitPrice,
   getProposalPricing,
@@ -56,9 +56,7 @@ export function ClientProposalPreview({
       <header className="mb-6 flex flex-col gap-4 border-b-2 border-deisida pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-2xl font-bold tracking-tight text-deisida">DEISIDA</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Komercinis pasiūlymas klientui
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Pasiūlymas klientui</p>
         </div>
         <dl className="grid gap-1 text-xs sm:text-right">
           <div className="flex gap-2 sm:justify-end">
@@ -102,7 +100,7 @@ export function ClientProposalPreview({
                 <th className="px-3 py-2.5 font-semibold">Matmenys</th>
                 <th className="px-3 py-2.5 font-semibold">Pjovimo storis</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Kiekis</th>
-                <th className="px-3 py-2.5 font-semibold text-right">Vnt. kaina</th>
+                <th className="px-3 py-2.5 font-semibold text-right">Kaina už vnt.</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Suma</th>
               </tr>
             </thead>
@@ -124,7 +122,7 @@ export function ClientProposalPreview({
                       {line.showStoris ? `${line.storisMm} mm` : "—"}
                     </td>
                     <td className="px-3 py-2.5 align-top text-right text-xs tabular-nums">
-                      {formatPieceQuantity(line)}
+                      {formatLineQuantity(line)}
                     </td>
                     <td className="px-3 py-2.5 align-top text-right tabular-nums">
                       {formatCatalogPrice(getLineUnitPrice(line))}

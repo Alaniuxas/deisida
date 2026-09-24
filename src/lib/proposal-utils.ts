@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { lt } from "date-fns/locale";
-import type { PackagingOptions, Proposal, TileLine } from "./types";
+import type { PackagingOptions, Proposal, QuantityUnit, TileLine } from "./types";
 import { PJUVIS_OPTIONS, defaultPackaging } from "./types";
 import { getTileById } from "./tiles";
 
@@ -18,7 +18,8 @@ export function createEmptyTileLine(tileId?: string): TileLine {
     id: crypto.randomUUID(),
     tileId: tile?.id ?? TILE_FALLBACK_ID,
     pjovimas: PJUVIS_OPTIONS[0],
-    quantityPallets: 1,
+    quantity: 1,
+    quantityUnit: "pallets",
     storisMm: tile?.defaultStorisMm ?? 25,
     showStoris: true,
     comment: "",
@@ -81,7 +82,30 @@ export function getLineCatalogPrice(line: TileLine): number {
 export function getLinePieceCount(line: TileLine): number {
   const tile = getTileById(line.tileId);
   if (!tile) return 0;
-  return Math.round(line.quantityPallets * tile.quantityPerPallet);
+  if (line.quantityUnit === "pieces") {
+    return Math.round(line.quantity);
+  }
+  return Math.round(line.quantity * tile.quantityPerPallet);
+}
+
+function formatQuantityNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(value).replace(".", ",");
+}
+
+export function formatPalletLabel(quantity: number): string {
+  if (quantity === 1) return "1 paletė";
+  return `${formatQuantityNumber(quantity)} paletės`;
+}
+
+export function formatLineQuantity(line: TileLine): string {
+  if (line.quantityUnit === "pieces") {
+    return `${formatQuantityNumber(line.quantity)} vnt.`;
+  }
+  return formatPalletLabel(line.quantity);
+}
+
+export function quantityUnitLabel(unit: QuantityUnit): string {
+  return unit === "pieces" ? "vnt." : "paletės";
 }
 
 export function getLineUnitPrice(line: TileLine): number {
@@ -107,13 +131,8 @@ export function getProposalPricing(proposal: Proposal): ProposalPricing {
   return { subtotal, vat, total: subtotal + vat };
 }
 
-export function formatPieceQuantity(line: TileLine): string {
-  const pieces = getLinePieceCount(line);
-  const palletsLabel = Number.isInteger(line.quantityPallets)
-    ? `${line.quantityPallets} pal.`
-    : `${line.quantityPallets} pal.`;
-  return `${pieces} vnt. (${palletsLabel})`;
-}
+/** @deprecated Use formatLineQuantity */
+export const formatPieceQuantity = formatLineQuantity;
 
 export function describePackagingChoices(packaging: PackagingOptions): string[] {
   const lines: string[] = [
@@ -183,7 +202,7 @@ export function describeProductionLine(line: TileLine, index: number): string[] 
     if (tile.fragilityCorner) info.push(`Brokas kampuose: ${tile.fragilityCorner}`);
   }
 
-  info.push(`Kiekis: ${formatPieceQuantity(line)}`);
+  info.push(`Kiekis: ${formatLineQuantity(line)}`);
   info.push(...describePackagingChoices(line.packaging));
 
   return info;
@@ -207,7 +226,7 @@ export function validateProposal(proposal: Proposal): string[] {
     if (!line.pjovimas.trim()) {
       errors.push(`Eilutė ${index + 1}: pasirinkite pjūvį.`);
     }
-    if (line.quantityPallets <= 0) {
+    if (line.quantity <= 0) {
       errors.push(`Eilutė ${index + 1}: kiekis turi būti didesnis už 0.`);
     }
     if (line.showStoris && line.storisMm <= 0) {

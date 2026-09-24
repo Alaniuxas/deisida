@@ -11,7 +11,7 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Deisida · Pasiūlymo kūrimas",
   description:
-    "Lietuviškas pasiūlymų kūrimo įrankis su PDF peržiūra ir vietinėmis pataisomis.",
+    "Lietuviškas pasiūlymų kūrimo įrankis su peržiūra ir atsisiuntimu.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

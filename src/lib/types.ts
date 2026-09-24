@@ -26,11 +26,14 @@ export interface PackagingOptions {
   rowInterlayer: boolean;
 }
 
+export type QuantityUnit = "pieces" | "pallets";
+
 export interface TileLine {
   id: string;
   tileId: string;
   pjovimas: string;
-  quantityPallets: number;
+  quantity: number;
+  quantityUnit: QuantityUnit;
   storisMm: number;
   showStoris: boolean;
   comment: string;

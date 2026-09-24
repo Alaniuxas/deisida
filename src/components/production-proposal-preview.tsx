@@ -5,7 +5,7 @@ import { L_CORNER_NOTE } from "@/lib/types";
 import {
   describeProductionLine,
   formatLtDate,
-  formatPieceQuantity,
+  formatLineQuantity,
 } from "@/lib/proposal-utils";
 import { getTileById } from "@/lib/tiles";
 
@@ -49,12 +49,8 @@ export function ProductionProposalPreview({
     >
       <header className="mb-6 flex flex-col gap-4 border-b-2 border-deisida-muted pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xl font-bold tracking-tight text-deisida-muted">
-            GAMYBOS UŽDUOTIS
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            DEISIDA · cechui ir gamybos eilei
-          </p>
+          <p className="text-xl font-bold tracking-tight text-deisida-muted">GAMYBA</p>
+          <p className="mt-1 text-xs text-muted-foreground">Darbo užduotis gamybai</p>
         </div>
         <dl className="grid gap-1 text-xs sm:text-right">
           <div className="flex gap-2 sm:justify-end">
@@ -108,7 +104,7 @@ export function ProductionProposalPreview({
                   <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                     Kiekis
                   </p>
-                  <p className="font-medium tabular-nums">{formatPieceQuantity(line)}</p>
+                  <p className="font-medium tabular-nums">{formatLineQuantity(line)}</p>
                 </div>
                 {tile?.disc ? (
                   <div className="sm:col-span-2">

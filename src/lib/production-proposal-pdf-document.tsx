@@ -13,7 +13,7 @@ import {
   describePackagingChoices,
   formatDimensions,
   formatLtDate,
-  formatPieceQuantity,
+  formatLineQuantity,
 } from "@/lib/proposal-utils";
 import { getTileById } from "@/lib/tiles";
 
@@ -176,8 +176,8 @@ export function ProductionProposalDocument({ proposal }: { proposal: Proposal })
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>GAMYBOS UŽDUOTIS</Text>
-            <Text style={styles.subtitle}>DEISIDA · cechui ir gamybos eilei</Text>
+            <Text style={styles.title}>GAMYBA</Text>
+            <Text style={styles.subtitle}>Darbo užduotis gamybai</Text>
           </View>
           <View style={styles.metaBlock}>
             <View style={styles.metaRow}>
@@ -221,7 +221,7 @@ export function ProductionProposalDocument({ proposal }: { proposal: Proposal })
                 </View>
                 <View style={styles.field}>
                   <Text style={styles.fieldLabel}>Kiekis</Text>
-                  <Text style={styles.fieldValue}>{formatPieceQuantity(line)}</Text>
+                  <Text style={styles.fieldValue}>{formatLineQuantity(line)}</Text>
                 </View>
                 {tile ? (
                   <View style={styles.fieldWide}>
@@ -272,7 +272,7 @@ export function ProductionProposalDocument({ proposal }: { proposal: Proposal })
 
         <View style={styles.footer} fixed>
           <Text>DEISIDA · Gamyba {proposal.number}</Text>
-          <Text>Vidaus dokumentas</Text>
+          <Text>Tik vidiniam naudojimui</Text>
         </View>
       </Page>
     </Document>

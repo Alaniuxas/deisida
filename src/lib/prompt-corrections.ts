@@ -1,5 +1,5 @@
 import type { PackagingOptions, Proposal, PromptResult, TileLine } from "./types";
-import { createEmptyTileLine } from "./proposal-utils";
+import { createEmptyTileLine, formatLineQuantity } from "./proposal-utils";
 import { getTileById, TILE_CATALOG } from "./tiles";
 
 function parseBoolean(value: string): boolean | null {
@@ -68,7 +68,7 @@ export function applyPromptCorrection(
       ...line,
       showStoris: false,
     }));
-    messages.push("Storis paslėptas PDF ir peržiūroje.");
+    messages.push("Storis neberodomas.");
     matched = true;
   }
 
@@ -77,7 +77,7 @@ export function applyPromptCorrection(
       ...line,
       showStoris: true,
     }));
-    messages.push("Storis rodomas PDF ir peržiūroje.");
+    messages.push("Storis rodomas.");
     matched = true;
   }
 
@@ -118,15 +118,20 @@ export function applyPromptCorrection(
   }
 
   const quantityMatch = trimmed.match(
-    /(?:kiekis|palet[eė]s?|quantity)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i,
+    /(?:kiekis|palet[eė]s?|vnt\.?|vienet[aą]?)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i,
   );
   if (quantityMatch?.[1]) {
     const quantity = Number(quantityMatch[1].replace(",", "."));
+    const usePieces = /vnt|vienet/i.test(trimmed);
+    const quantityUnit = usePieces ? "pieces" : "pallets";
     next.tileLines = updateLine(next.tileLines, lineIndex, (line) => ({
       ...line,
-      quantityPallets: quantity,
+      quantity,
+      quantityUnit,
     }));
-    messages.push(`Eilutė ${lineIndex + 1}: kiekis pakeistas į ${quantity} palet.`);
+    messages.push(
+      `Eilutė ${lineIndex + 1}: kiekis pakeistas į ${formatLineQuantity(next.tileLines[lineIndex])}.`,
+    );
     matched = true;
   }
 
@@ -254,9 +259,7 @@ export function applyPromptCorrection(
       ...next,
       extraClauses: [...next.extraClauses, trimmed],
     };
-    messages.push(
-      "Tekstas įrašytas kaip papildoma sąlyga (be debesies modelio – tiksliai taip, kaip įvedėte).",
-    );
+    messages.push("Pridėta papildoma sąlyga.");
   }
 
   return {

@@ -13,7 +13,7 @@ import {
   formatCatalogPrice,
   formatDimensions,
   formatLtDate,
-  formatPieceQuantity,
+  formatLineQuantity,
   getLineSubtotal,
   getLineUnitPrice,
   getProposalPricing,
@@ -207,7 +207,7 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
         <View style={styles.header}>
           <View>
             <Text style={styles.brand}>DEISIDA</Text>
-            <Text style={styles.brandSub}>Komercinis pasiūlymas klientui</Text>
+            <Text style={styles.brandSub}>Pasiūlymas klientui</Text>
           </View>
           <View style={styles.metaBlock}>
             <View style={styles.metaRow}>
@@ -246,7 +246,7 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
             <Text style={[styles.th, styles.colDim]}>Matmenys</Text>
             <Text style={[styles.th, styles.colThick]}>Pjovimo storis</Text>
             <Text style={[styles.th, styles.colQty]}>Kiekis</Text>
-            <Text style={[styles.th, styles.colUnit]}>Vnt. kaina</Text>
+            <Text style={[styles.th, styles.colUnit]}>Kaina už vnt.</Text>
             <Text style={[styles.th, styles.colSum]}>Suma</Text>
           </View>
           {proposal.tileLines.map((line) => {
@@ -264,7 +264,7 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
                   {line.showStoris ? `${line.storisMm} mm` : "—"}
                 </Text>
                 <Text style={[styles.td, styles.colQty]}>
-                  {formatPieceQuantity(line)}
+                  {formatLineQuantity(line)}
                 </Text>
                 <Text style={[styles.td, styles.colUnit]}>
                   {formatCatalogPrice(getLineUnitPrice(line))}
@@ -324,7 +324,7 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
 
         <View style={styles.footer} fixed>
           <Text>DEISIDA · Pasiūlymas {proposal.number}</Text>
-          <Text>Sugeneruota vietoje</Text>
+          <Text>deisida.lt</Text>
         </View>
       </Page>
     </Document>
