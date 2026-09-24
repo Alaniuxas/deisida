@@ -396,7 +396,9 @@ export function ProposalCreator() {
                   onChange={(event) =>
                     setProposal({ ...proposal, client: event.target.value })
                   }
-                  placeholder="Ieškokite kliento"
+                  placeholder="Įveskite kliento pavadinimą"
+                  aria-invalid={!proposal.client.trim()}
+                  required
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
@@ -408,6 +410,8 @@ export function ProposalCreator() {
                     setProposal({ ...proposal, object: event.target.value })
                   }
                   placeholder="Įveskite objekto pavadinimą"
+                  aria-invalid={!proposal.object.trim()}
+                  required
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
@@ -424,6 +428,8 @@ export function ProposalCreator() {
               </div>
             </CardContent>
           </Card>
+
+          <PromptCorrectionBox onApply={handlePromptApply} messages={promptMessages} />
 
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
@@ -468,8 +474,6 @@ export function ProposalCreator() {
               ))
             )}
           </div>
-
-          <PromptCorrectionBox onApply={handlePromptApply} messages={promptMessages} />
 
           {formError || validationErrors.length > 0 ? (
             <Alert variant="destructive">

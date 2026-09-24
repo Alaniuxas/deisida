@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 interface PromptCorrectionBoxProps {
@@ -17,18 +18,25 @@ export function PromptCorrectionBox({
   const [prompt, setPrompt] = useState("");
 
   return (
-    <div className="space-y-3 rounded-lg border bg-card p-4">
+    <div
+      id="pataisos"
+      className="scroll-mt-24 space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-4"
+    >
       <div>
         <h3 className="text-sm font-semibold">Pataisos pagal užklausą</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Pataisymai taikomi vietoje, be debesies modelio. Galite naudoti komandas
-          (pvz. „klientas: UAB Statyba“, „storis: 25“, „pakuoti tik neskilusi: taip“,
-          „paslėpti storis“, „pridėti eilutę“) arba įrašyti laisvą tekstą kaip
+          Įveskite pataisą žemiau. Pataisymai taikomi vietoje, be debesies modelio.
+          Galite naudoti komandas (pvz. „klientas: UAB Statyba“, „storis: 25“,
+          „pakuoti tik neskilusi: taip“, „paslėpti storis“) arba laisvą tekstą kaip
           papildomą sąlygą.
         </p>
       </div>
 
+      <Label htmlFor="prompt-correction" className="sr-only">
+        Pataisos tekstas
+      </Label>
       <Textarea
+        id="prompt-correction"
         value={prompt}
         onChange={(event) => setPrompt(event.target.value)}
         placeholder="Pvz.: klientas: UAB Statyba · storis: 25 · pakuoti tik neskilusi: taip · Pridedame papildomą garantiją 12 mėn."

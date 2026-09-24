@@ -19,6 +19,9 @@ Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127`.
 - Seeded tile catalog (4 example tiles from screenshots)
 - Local prompt corrections (commands + freeform clauses), no cloud LLM
 - Fixed L kampų pjovimas note on every proposal
-- Verified: form → preview grid → prompt clause → PDF download (Playwright on prod build)
+- Verified: form → preview grid → prompt clause → PDF download (dev + prod)
+- Dev fix: `allowedDevOrigins` in `next.config.ts` (HMR was blocked, breaking React hydration)
+
+Worker agents use Composer 2.5. The coordinator only coordinates.
 
 Do not deploy without asking Alanas.
