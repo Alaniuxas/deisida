@@ -10,7 +10,7 @@ import {
 import type { Proposal } from "@/lib/types";
 import { L_CORNER_NOTE } from "@/lib/types";
 import {
-  describePackagingChoices,
+  describeClientPackaging,
   formatCatalogPrice,
   formatDimensions,
   formatLineStoris,
@@ -207,6 +207,7 @@ const styles = StyleSheet.create({
 
 export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
   const pricing = getProposalPricing(proposal);
+  const clientPackaging = describeClientPackaging(proposal.packaging);
   const hasComments = proposal.comment || proposal.extraClauses.length > 0;
 
   return (
@@ -283,15 +284,16 @@ export function ClientProposalDocument({ proposal }: { proposal: Proposal }) {
           })}
         </View>
 
-        <View style={styles.orderBox}>
-          <Text style={styles.commentTitle}>Gamyba ir pakavimas</Text>
-          <Text style={styles.orderLine}>Baras: {proposal.pjovimas}</Text>
-          {describePackagingChoices(proposal.packaging).map((item) => (
-            <Text key={item} style={styles.orderLine}>
-              {item}
-            </Text>
-          ))}
-        </View>
+        {clientPackaging.length > 0 ? (
+          <View style={styles.orderBox}>
+            <Text style={styles.commentTitle}>Pakavimas</Text>
+            {clientPackaging.map((item) => (
+              <Text key={item} style={styles.orderLine}>
+                {item}
+              </Text>
+            ))}
+          </View>
+        ) : null}
 
         <View style={styles.totals}>
           <View style={styles.totalRow}>

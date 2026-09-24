@@ -205,6 +205,29 @@ export function describePackagingChoices(packaging: PackagingOptions): string[] 
   return lines;
 }
 
+/** Client-facing packaging: only affirmative choices and selected types. */
+export function describeClientPackaging(packaging: PackagingOptions): string[] {
+  const lines: string[] = [];
+
+  if (packaging.packOnlyIntact === true) {
+    lines.push("Pakuoti tik neskilusi gaminį");
+  }
+  if (packaging.packTwoParts === true) {
+    lines.push("Pakuoti į 2 dalis skilusi");
+  }
+  if (packaging.packMoreThanTwoParts === true) {
+    lines.push("Pakuoti daugiau nei į 2 dalis (visą dūžį)");
+  }
+  if (packaging.needLeftovers === true) {
+    lines.push("Reikalingi likučiai");
+  }
+  if (packaging.baseProtection) lines.push("Bazinė apsauga");
+  if (packaging.bottomInterlayer) lines.push("Apatinis perklojimas");
+  if (packaging.rowInterlayer) lines.push("Kiekvienos eilės perklojimas");
+
+  return lines;
+}
+
 export function describeLineSideInfo(line: TileLine, index: number): string[] {
   const tile = getTileById(line.tileId);
   const info: string[] = [`Eilutė ${index + 1} · ${tile?.name ?? "—"}`];

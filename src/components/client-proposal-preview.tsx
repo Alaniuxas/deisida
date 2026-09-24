@@ -3,7 +3,7 @@
 import type { Proposal } from "@/lib/types";
 import { L_CORNER_NOTE } from "@/lib/types";
 import {
-  describePackagingChoices,
+  describeClientPackaging,
   formatCatalogPrice,
   formatDimensions,
   formatLineStoris,
@@ -29,6 +29,7 @@ export function ClientProposalPreview({
   compact = false,
 }: ClientProposalPreviewProps) {
   const pricing = getProposalPricing(proposal);
+  const clientPackaging = describeClientPackaging(proposal.packaging);
 
   if (loading) {
     return (
@@ -138,20 +139,18 @@ export function ClientProposalPreview({
         </div>
       </section>
 
-      <section className="mb-6 rounded-md border border-stone-line bg-[#f3f3f0] px-4 py-4">
-        <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-deisida-muted">
-          Gamyba ir pakavimas
-        </h3>
-        <dl className="space-y-2 text-xs leading-relaxed">
-          <div className="grid grid-cols-[8rem_1fr] gap-3">
-            <dt className="font-semibold text-muted-foreground">Baras</dt>
-            <dd>{proposal.pjovimas}</dd>
-          </div>
-          {describePackagingChoices(proposal.packaging).map((item) => (
-            <p key={item}>{item}</p>
-          ))}
-        </dl>
-      </section>
+      {clientPackaging.length > 0 ? (
+        <section className="mb-6 rounded-md border border-stone-line bg-[#f3f3f0] px-4 py-4">
+          <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-deisida-muted">
+            Pakavimas
+          </h3>
+          <ul className="space-y-1.5 text-xs leading-relaxed">
+            {clientPackaging.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="mb-6 flex justify-end">
         <dl className="min-w-[220px] space-y-1 text-sm">

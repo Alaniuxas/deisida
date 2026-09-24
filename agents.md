@@ -16,11 +16,13 @@ Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127`.
 ## App status (2026-09-24)
 
 - **Per line:** plytelė, auto pjovimo storis (from tile aukštis), kiekis with **vnt./paletės**, read-only kaina už vnt.
-- **Once per order:** baras (pjūvis) and full pakavimas block
-- Client PDF rows: plytelė, matmenys, auto storis, kiekis, kaina, suma — baras and pakavimas once below the table
+- **Once per order (form):** baras (pjūvis) and full pakavimas block
+- **Client preview/PDF:** no baras; optional **Pakavimas** block shows only affirmative choices (Taip tri-states + selected checkboxes). Omits the block when nothing applies. No yes/no dump.
+- **Production preview/PDF:** baras and full packaging detail for the floor (unchanged)
+- Client PDF rows: plytelė, matmenys, auto storis, kiekis, kaina, suma
 - Production PDF: each tile shows auto storis, kiekis, diskas — baras and pakavimas once for the order (no prices)
-- Downloads in header and preview panel with plain confirmation message
+- **Downloads:** single working pair in page header only (`Atsisiųsti klientui` / `Atsisiųsti gamybai`); filenames `{numeris}_Klientui.pdf` / `{numeris}_Gamyba.pdf`; plain confirmation on success; validation errors shown in header area
 
-Screenshots: `/cursor/stores/self/media/proposal-lines/`, `/cursor/stores/self/media/proposal-downloads/`
+Screenshots: `/cursor/stores/self/media/proposal-lines/`, `/cursor/stores/self/media/proposal-downloads/` (includes `04-single-working-buttons.png`, `05-client-packaging.png`)
 
 Do not deploy without asking Alanas.

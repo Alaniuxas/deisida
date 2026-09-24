@@ -291,23 +291,16 @@ function TileLineEditor({
 function DownloadButtons({
   onDownload,
   loading,
-  layout = "header",
 }: {
   onDownload: (kind: PdfKind) => void;
   loading: boolean;
-  layout?: "header" | "preview";
 }) {
-  const baseClass =
-    layout === "header"
-      ? "h-10"
-      : "h-10 flex-1 sm:flex-none";
-
   return (
     <>
       <Button
         type="button"
         variant="outline"
-        className={`${baseClass} gap-2 border-deisida-muted text-deisida-muted hover:bg-[#f3f3f0]`}
+        className="h-10 gap-2 border-deisida-muted text-deisida-muted hover:bg-[#f3f3f0]"
         onClick={() => onDownload("production")}
         disabled={loading}
       >
@@ -316,7 +309,7 @@ function DownloadButtons({
       </Button>
       <Button
         type="button"
-        className={`${baseClass} gap-2 bg-deisida text-deisida-foreground hover:bg-deisida/90`}
+        className="h-10 gap-2 bg-deisida text-deisida-foreground hover:bg-deisida/90"
         onClick={() => onDownload("client")}
         disabled={loading}
       >
@@ -333,6 +326,7 @@ export function ProposalCreator() {
   const [pdfState, setPdfState] = useState<"idle" | "loading" | "error">("idle");
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [downloadNote, setDownloadNote] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("edit");
   const [previewDoc, setPreviewDoc] = useState<PreviewDoc>("client");
   const [isMobileLayout, setIsMobileLayout] = useState(false);
@@ -388,9 +382,13 @@ export function ProposalCreator() {
   };
 
   const handleDownloadPdf = async (kind: PdfKind) => {
+    setDownloadNote(null);
+    setDownloadError(null);
+
     const errors = validateProposal(proposal);
     if (errors.length > 0) {
       setFormError(errors[0]);
+      setDownloadError(errors[0]);
       return;
     }
 
@@ -407,9 +405,10 @@ export function ProposalCreator() {
       setPdfState("idle");
     } catch (error) {
       setPdfState("error");
-      setPdfError(
-        error instanceof Error ? error.message : "Nepavyko paruošti failo.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Nepavyko paruošti failo.";
+      setPdfError(message);
+      setDownloadError(message);
     }
   };
 
@@ -443,13 +442,16 @@ export function ProposalCreator() {
             <DownloadButtons
               onDownload={handleDownloadPdf}
               loading={pdfState === "loading"}
-              layout="header"
             />
           </div>
         </div>
         {downloadNote ? (
           <div className="border-t border-stone-line bg-[#eef6ee] px-6 py-3 text-sm text-[#2d5a2d] lg:px-10">
             {downloadNote}
+          </div>
+        ) : downloadError ? (
+          <div className="border-t border-stone-line bg-[#fdeeee] px-6 py-3 text-sm text-destructive lg:px-10">
+            {downloadError}
           </div>
         ) : null}
       </header>
@@ -646,22 +648,6 @@ export function ProposalCreator() {
                 <TabsTrigger value="production">Gamyba</TabsTrigger>
               </TabsList>
             </Tabs>
-          </div>
-          <div className="border-b border-stone-line px-6 py-4 lg:px-8">
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <DownloadButtons
-                onDownload={handleDownloadPdf}
-                loading={pdfState === "loading"}
-                layout="preview"
-              />
-            </div>
-            {downloadNote ? (
-              <p className="mt-3 text-sm text-[#2d5a2d]">{downloadNote}</p>
-            ) : (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Paspauskite mygtuką — failas bus išsaugotas jūsų įrenginyje.
-              </p>
-            )}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-6 lg:p-8">
             {showClientPreview ? (
