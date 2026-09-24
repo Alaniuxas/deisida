@@ -35,73 +35,58 @@ async function main() {
   await page.getByRole("button", { name: "Pridėti eilutę" }).click();
   await page.waitForTimeout(700);
 
-  await page.evaluate(() => {
+  const metrics = await page.evaluate(() => {
     const editor = Array.from(document.querySelectorAll("div")).find(
       (node) =>
         node.className.includes("min-h-0") &&
         node.className.includes("overflow-y-auto") &&
-        node.querySelector("section.bg-white"),
-    ) as HTMLElement | undefined;
-    if (editor) editor.scrollTop = 0;
-  });
-  await page.waitForTimeout(300);
-
-  const metrics = await page.evaluate(() => {
-    const editor = Array.from(document.querySelectorAll("div")).find((node) =>
-      node.className.includes("min-h-0") &&
-      node.className.includes("overflow-y-auto") &&
-      node.querySelector("section.bg-white"),
+        node.querySelector("[data-tile-lines-section]"),
     );
     const headings = Array.from(document.querySelectorAll("h3"))
       .filter((h) => h.textContent?.startsWith("Eilutė"))
       .map((h) => h.textContent);
-    const line2 = document.getElementById("tile-line-1");
-    const rect2 = line2?.getBoundingClientRect();
     return {
       lineCount: headings.length,
       headings,
       editorScrollable: editor
         ? editor.scrollHeight > editor.clientHeight
         : false,
-      line2InViewport: rect2
-        ? rect2.top >= 0 && rect2.bottom <= window.innerHeight
-        : false,
       previewRows: document.querySelectorAll("aside tbody tr").length,
-      productionBlocks: document.querySelectorAll("aside h3").length,
     };
   });
 
   await page.getByRole("tab", { name: "Gamyba" }).click();
   await page.waitForTimeout(400);
-
   const productionBlocks = await page.locator("aside h3").count();
 
-  await page.getByRole("tab", { name: "Klientui" }).click();
+  await page.evaluate(() => {
+    const editor = Array.from(document.querySelectorAll("div")).find(
+      (node) =>
+        node.className.includes("min-h-0") &&
+        node.className.includes("overflow-y-auto") &&
+        node.querySelector("[data-tile-lines-section]"),
+    ) as HTMLElement | undefined;
+    const row = editor?.parentElement as HTMLElement | undefined;
+    const root = document.querySelector(".h-screen") as HTMLElement | null;
+    if (editor) {
+      editor.style.overflow = "visible";
+      editor.style.height = `${editor.scrollHeight}px`;
+    }
+    if (row) {
+      row.style.overflow = "visible";
+      row.style.height = "auto";
+    }
+    if (root) {
+      root.style.height = "auto";
+      root.style.overflow = "visible";
+    }
+  });
   await page.waitForTimeout(200);
-
-  const tilesSection = page.locator("section.bg-white").last();
-  await tilesSection.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(200);
-
-  const box = await tilesSection.boundingBox();
-  if (box) {
-    await page.screenshot({
-      path: path.join(MEDIA, "form-with-three-lines.png"),
-      clip: {
-        x: box.x,
-        y: box.y,
-        width: Math.min(box.width, 980),
-        height: Math.min(box.height, 2400),
-      },
-    });
-  } else {
-    await page.screenshot({
-      path: path.join(MEDIA, "form-with-three-lines.png"),
-      fullPage: true,
-    });
-  }
 
   const screenshotPath = path.join(MEDIA, "form-with-three-lines.png");
+  await page.locator("[data-tile-lines-section]").screenshot({
+    path: screenshotPath,
+  });
 
   console.log(
     JSON.stringify(
