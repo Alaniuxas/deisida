@@ -22,13 +22,36 @@ export function generateProposalNumber(sequence = 2): string {
   return `DEI${stamp}-${sequence}`;
 }
 
+export function createLineId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `line-${crypto.randomUUID()}`;
+  }
+  return `line-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+}
+
 export function createEmptyTileLine(tileId?: string, id?: string): TileLine {
   return {
-    id: id ?? `line-${crypto.randomUUID()}`,
+    id: id ?? createLineId(),
     tileId: tileId ?? "",
     quantity: 1,
     quantityUnit: "pallets",
   };
+}
+
+export function ensureProposalLineCount(
+  proposal: Proposal,
+  lineCount: number,
+): Proposal {
+  const target = Math.min(Math.max(lineCount, 1), 10);
+  const tileLines = [...proposal.tileLines];
+
+  while (tileLines.length < target) {
+    tileLines.push(createEmptyTileLine());
+  }
+
+  return tileLines.length === proposal.tileLines.length
+    ? proposal
+    : { ...proposal, tileLines };
 }
 
 export function createDefaultProposal(tileId?: string): Proposal {

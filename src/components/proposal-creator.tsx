@@ -12,6 +12,7 @@ import { PJUVIS_OPTIONS } from "@/lib/types";
 import {
   createDefaultProposal,
   createEmptyTileLine,
+  ensureProposalLineCount,
   formatCatalogPrice,
   formatLineStoris,
   getLineCatalogPrice,
@@ -43,6 +44,11 @@ import { cn } from "@/lib/utils";
 import { LithuanianDatePicker } from "@/components/lithuanian-date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Download } from "lucide-react";
+import {
+  clearProposalDraft,
+  loadProposalDraft,
+  saveProposalDraft,
+} from "@/lib/proposal-draft-storage";
 
 type MobileTab = "edit" | "client" | "production";
 type PreviewDoc = "client" | "production";
@@ -211,7 +217,12 @@ function TileLineEditor({
   const tileLabel = tile?.name ?? null;
 
   return (
-    <div id={`tile-line-${index}`} className="border-b border-stone-line last:border-b-0">
+    <div
+      id={`tile-line-${index}`}
+      data-tile-line={index + 1}
+      data-tile-line-id={line.id}
+      className="border-b border-stone-line last:border-b-0"
+    >
       <div className="flex items-center justify-between bg-[#f3f3f0] px-6 py-3 lg:px-10">
         <h3 className="text-sm font-semibold text-deisida-muted">Eilutė {index + 1}</h3>
         {canRemove ? (
@@ -225,6 +236,8 @@ function TileLineEditor({
         <FormField label="Plytelė">
           <TileSearchSelect
             inputId={`tile-${line.id}`}
+            fieldName={`lineTile-${index}`}
+            form="add-tile-line-form"
             value={line.tileId}
             catalog={catalog}
             onChange={(tileId) => onChange({ ...line, tileId })}
@@ -324,6 +337,44 @@ interface ProposalCreatorProps {
   proposalId?: string;
   initialProposal?: Proposal;
   initialStatus?: string;
+  initialLineCount?: number;
+  seedTileIds?: string[];
+}
+
+function applySeedTileIds(proposal: Proposal, seedTileIds: string[]): Proposal {
+  if (seedTileIds.length === 0) return proposal;
+  const tileLines = [...proposal.tileLines];
+  seedTileIds.forEach((tileId, index) => {
+    if (!tileId) return;
+    if (tileLines[index]) {
+      tileLines[index] = { ...tileLines[index], tileId };
+    } else {
+      tileLines.push(createEmptyTileLine(tileId));
+    }
+  });
+  return { ...proposal, tileLines };
+}
+
+function buildInitialProposal(
+  catalog: Tile[],
+  initialProposal?: Proposal,
+  initialLineCount = 1,
+  editingId?: string,
+  seedTileIds: string[] = [],
+): Proposal {
+  const base = initialProposal ?? createDefaultProposal(catalog[0]?.id);
+  const seeded = applySeedTileIds(base, seedTileIds);
+  const withLines = ensureProposalLineCount(seeded, initialLineCount);
+
+  if (initialProposal || editingId || seedTileIds.some(Boolean)) {
+    return withLines;
+  }
+
+  const draft = loadProposalDraft();
+  if (!draft) return withLines;
+
+  const merged = ensureProposalLineCount(draft, initialLineCount);
+  return merged.tileLines.length >= withLines.tileLines.length ? merged : withLines;
 }
 
 export function ProposalCreator({
@@ -331,12 +382,20 @@ export function ProposalCreator({
   proposalId,
   initialProposal,
   initialStatus = "draft",
+  initialLineCount = 1,
+  seedTileIds = [],
 }: ProposalCreatorProps) {
   const router = useRouter();
   const [savedId, setSavedId] = useState<string | undefined>(proposalId);
   const [status, setStatus] = useState(initialStatus);
-  const [proposal, setProposal] = useState<Proposal>(
-    () => initialProposal ?? createDefaultProposal(catalog[0]?.id),
+  const [proposal, setProposal] = useState<Proposal>(() =>
+    buildInitialProposal(
+      catalog,
+      initialProposal,
+      initialLineCount,
+      proposalId,
+      seedTileIds,
+    ),
   );
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -349,10 +408,23 @@ export function ProposalCreator({
   const [previewDoc, setPreviewDoc] = useState<PreviewDoc>("client");
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const pendingScrollLineIndex = useRef<number | null>(null);
+  const addLinePath = savedId ? `/pasiulymai/${savedId}` : "/pasiulymai/naujas";
 
   useEffect(() => {
     setRuntimeCatalog(catalog);
   }, [catalog]);
+
+  useEffect(() => {
+    setProposal((current) => {
+      if (current.tileLines.length >= initialLineCount) return current;
+      return ensureProposalLineCount(current, initialLineCount);
+    });
+  }, [initialLineCount]);
+
+  useEffect(() => {
+    if (proposalId || initialProposal) return;
+    saveProposalDraft(proposal);
+  }, [proposal, proposalId, initialProposal]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1279px)");
@@ -444,6 +516,7 @@ export function ProposalCreator({
         setSaveMessage(
           `Pasiūlymas patvirtintas. Sukurta ${created} gamybos ${created === 1 ? "darbas" : "darbai"} (${lineCount} plytelių ${lineCount === 1 ? "tipas" : "tipai"}).`,
         );
+        clearProposalDraft();
       }
 
       return id;
@@ -692,17 +765,38 @@ export function ProposalCreator({
             </div>
           </section>
 
-          <section className="bg-white" data-tile-lines-section>
+          <section
+            className="bg-white"
+            data-tile-lines-section
+            data-tile-lines-count={proposal.tileLines.length}
+          >
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-line px-6 py-6 lg:px-10">
               <h2 className="text-lg font-semibold text-deisida-muted">Plytelės</h2>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 border-stone-line bg-paper"
-                onClick={addTileLine}
+              <form
+                id="add-tile-line-form"
+                method="get"
+                action={addLinePath}
+                data-add-tile-line-form
+                className="inline"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  addTileLine();
+                }}
               >
-                Pridėti eilutę
-              </Button>
+                <input
+                  type="hidden"
+                  name="lines"
+                  value={proposal.tileLines.length + 1}
+                />
+                <button
+                  type="submit"
+                  data-add-tile-line
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-stone-line bg-paper px-4 text-sm font-medium hover:bg-muted/60"
+                >
+                  Pridėti eilutę
+                </button>
+              </form>
             </div>
 
             {proposal.tileLines.map((line, index) => (

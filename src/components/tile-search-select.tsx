@@ -3,16 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Tile } from "@/lib/types";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface TileSearchSelectProps {
   inputId: string;
+  fieldName?: string;
+  form?: string;
   value: string;
   catalog: Tile[];
   onChange: (tileId: string) => void;
@@ -21,6 +17,8 @@ interface TileSearchSelectProps {
 
 export function TileSearchSelect({
   inputId,
+  fieldName,
+  form,
   value,
   catalog,
   onChange,
@@ -35,61 +33,49 @@ export function TileSearchSelect({
 
   const filtered = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
-    if (!trimmed) return catalog.slice(0, 80);
+    if (!trimmed) return catalog.slice(0, 120);
     return catalog
       .filter(
         (tile) =>
           tile.name.toLowerCase().includes(trimmed) ||
           tile.supplier.toLowerCase().includes(trimmed),
       )
-      .slice(0, 80);
+      .slice(0, 120);
   }, [catalog, query]);
 
-  const selectValue = value || "__unselected";
-
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-tile-search={inputId}>
       <Input
         id={`${inputId}-search`}
+        name={`${inputId}-search`}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Ieškoti plytelės…"
+        autoComplete="off"
         className={cn("h-10 bg-paper", className)}
       />
-      <Select
-        value={selectValue}
-        onValueChange={(tileId) => {
-          if (!tileId || tileId === "__unselected") return;
-          onChange(tileId);
+      <select
+        id={inputId}
+        name={fieldName ?? inputId}
+        form={form}
+        value={value}
+        onChange={(event) => {
+          const tileId = event.target.value;
+          if (tileId) onChange(tileId);
         }}
+        className={cn(
+          "flex h-10 w-full rounded-md border border-input bg-paper px-3 text-sm",
+          className,
+        )}
       >
-        <SelectTrigger
-          id={inputId}
-          aria-label="Pasirinkite plytelę"
-          className={cn("h-10 bg-paper", className)}
-        >
-          <span className="truncate">
-            {selected?.name ?? "Pasirinkite plytelę"}
-          </span>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__unselected" disabled>
-            Pasirinkite plytelę
-          </SelectItem>
-          {filtered.length === 0 ? (
-            <SelectItem value="__empty" disabled>
-              Nieko nerasta
-            </SelectItem>
-          ) : (
-            filtered.map((tile) => (
-              <SelectItem key={`${inputId}-${tile.id}`} value={tile.id}>
-                {tile.name}
-                {tile.supplier ? ` · ${tile.supplier}` : ""}
-              </SelectItem>
-            ))
-          )}
-        </SelectContent>
-      </Select>
+        <option value="">Pasirinkite plytelę</option>
+        {filtered.map((tile) => (
+          <option key={`${inputId}-${tile.id}`} value={tile.id}>
+            {tile.name}
+            {tile.supplier ? ` · ${tile.supplier}` : ""}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
