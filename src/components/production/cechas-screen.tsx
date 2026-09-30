@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Package, Ruler, Layers, RefreshCw } from "lucide-react";
+import { Package, Ruler, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -17,22 +17,14 @@ import {
   fetchNextJob,
   finishJob,
   logPallet,
-  switchConveyor,
 } from "@/lib/production-api";
 import { formatPackagingLines } from "@/lib/packaging-labels";
 import type {
   ConveyorInfo,
-  MachineCode,
   NextJobResponse,
   ProductionApiError,
   ShopJob,
 } from "@/lib/production-types";
-
-interface ConveyorOption {
-  id: string;
-  code: MachineCode;
-  name: string;
-}
 
 function quantityLabel(unit: ShopJob["quantityUnit"], count: number): string {
   if (unit === "pallets") {
@@ -43,10 +35,10 @@ function quantityLabel(unit: ShopJob["quantityUnit"], count: number): string {
 
 interface CechasScreenProps {
   initialData?: NextJobResponse;
-  machines?: ConveyorOption[];
+  embedded?: boolean;
 }
 
-export function CechasScreen({ initialData, machines = [] }: CechasScreenProps) {
+export function CechasScreen({ initialData, embedded = false }: CechasScreenProps) {
   const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<ProductionApiError | null>(null);
   const [conveyor, setConveyor] = useState<ConveyorInfo | null>(
@@ -58,8 +50,6 @@ export function CechasScreen({ initialData, machines = [] }: CechasScreenProps) 
   const [finishReason, setFinishReason] = useState("");
   const [finishNotice, setFinishNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [deviceNotice, setDeviceNotice] = useState<string | null>(null);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -102,33 +92,6 @@ export function CechasScreen({ initialData, machines = [] }: CechasScreenProps) 
       active = false;
     };
   }, [initialData]);
-
-  const handleSwitchConveyor = async (machineCode: MachineCode) => {
-    if (!conveyor || conveyor.code === machineCode) return;
-    setActionLoading(true);
-    setActionError(null);
-    setDeviceNotice(null);
-    try {
-      const data = await switchConveyor(machineCode);
-      setConveyor(data.conveyor ?? null);
-      setJob(data.job ?? null);
-      const label = machines.find((machine) => machine.code === machineCode)?.name;
-      setDeviceNotice(
-        label
-          ? `Įrenginys pakeistas į ${machineCode} (${label}).`
-          : `Įrenginys pakeistas į ${machineCode}.`,
-      );
-    } catch (err) {
-      const apiErr = err as ProductionApiError;
-      setActionError(
-        apiErr.kind === "not_found"
-          ? "Įrenginio keitimas dar neveikia — API nepasiekiama."
-          : apiErr.message,
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const handlePallet = async () => {
     if (!job) return;
@@ -196,15 +159,8 @@ export function CechasScreen({ initialData, machines = [] }: CechasScreenProps) 
     ? Math.round((job.quantityLogged / job.quantityPlanned) * 100)
     : 0;
 
-  return (
-    <PageShell
-      title="Cechas"
-      subtitle={
-        conveyor
-          ? `Jūsų konvejeris: ${conveyor.name} (${conveyor.code})`
-          : "Kitas darbas jūsų konvejeryje"
-      }
-    >
+  const content = (
+    <>
       {loading ? <LoadingState label="Kraunamas darbas…" /> : null}
 
       {!loading && error ? (
@@ -241,55 +197,6 @@ export function CechasScreen({ initialData, machines = [] }: CechasScreenProps) 
                 {actionError}
               </AlertDescription>
             </Alert>
-          ) : null}
-
-          {deviceNotice ? (
-            <Alert className="rounded-xl border-deisida/30 bg-deisida/5 px-4 py-4">
-              <AlertTitle className="text-base text-deisida">
-                {deviceNotice}
-              </AlertTitle>
-            </Alert>
-          ) : null}
-
-          {job && machines.length > 0 && conveyor ? (
-            <Card className="rounded-2xl border-stone-line">
-              <CardContent className="space-y-4 pt-5">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <RefreshCw className="size-4" />
-                  Keisti įrenginį
-                </div>
-                <p className="text-base">
-                  Dabar dirbate:{" "}
-                  <span className="font-semibold text-ink">
-                    {conveyor.code} — {conveyor.name}
-                  </span>
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {machines.map((machine) => {
-                    const active = conveyor.code === machine.code;
-                    return (
-                      <Button
-                        key={machine.id}
-                        type="button"
-                        variant={active ? "default" : "outline"}
-                        disabled={actionLoading || active}
-                        onClick={() => handleSwitchConveyor(machine.code)}
-                        className={`h-14 rounded-xl text-base font-semibold ${
-                          active
-                            ? "bg-deisida text-deisida-foreground hover:bg-deisida/90"
-                            : "border-stone-line"
-                        }`}
-                      >
-                        {machine.code}
-                        <span className="ml-2 font-normal opacity-80">
-                          {machine.name}
-                        </span>
-                      </Button>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
           ) : null}
 
           <Card className="paper-shadow rounded-2xl border-stone-line">
@@ -419,6 +326,23 @@ export function CechasScreen({ initialData, machines = [] }: CechasScreenProps) 
           )}
         </div>
       ) : null}
+    </>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <PageShell
+      title="Cechas"
+      subtitle={
+        conveyor
+          ? `Jūsų konvejeris: ${conveyor.name} (${conveyor.code})`
+          : "Kitas darbas jūsų konvejeryje"
+      }
+    >
+      {content}
     </PageShell>
   );
 }
