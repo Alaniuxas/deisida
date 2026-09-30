@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { lt } from "date-fns/locale";
-import type { PackagingOptions, Proposal, QuantityUnit, TileLine } from "./types";
+import type { PackagingOptions, Proposal, QuantityUnit, Tile, TileLine } from "./types";
 import { PJUVIS_OPTIONS, defaultPackaging } from "./types";
 import { getTileById } from "./tiles";
 
@@ -310,7 +310,7 @@ export function describeProductionLine(line: TileLine, index: number): string[] 
   return info;
 }
 
-export function validateProposal(proposal: Proposal): string[] {
+export function validateProposal(proposal: Proposal, catalog?: Tile[]): string[] {
   const errors: string[] = [];
   if (!proposal.client.trim()) errors.push("Nurodykite klientą.");
   if (!proposal.object.trim()) errors.push("Nurodykite objektą.");
@@ -322,8 +322,14 @@ export function validateProposal(proposal: Proposal): string[] {
     errors.push("Pridėkite bent vieną plytelių eilutę.");
   }
 
+  const tileKnown = (tileId: string) =>
+    Boolean(tileId) &&
+    Boolean(
+      catalog?.some((tile) => tile.id === tileId) || getTileById(tileId),
+    );
+
   proposal.tileLines.forEach((line, index) => {
-    if (!getTileById(line.tileId)) {
+    if (!tileKnown(line.tileId)) {
       errors.push(`Eilutė ${index + 1}: pasirinkite plytelę.`);
     }
     if (line.quantity <= 0) {

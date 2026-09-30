@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import type { Tile } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -25,49 +25,26 @@ export function TileSearchSelect({
   className,
 }: TileSearchSelectProps) {
   const [query, setQuery] = useState("");
-  const selected = value ? catalog.find((tile) => tile.id === value) : undefined;
-
-  useEffect(() => {
-    setQuery(selected?.name ?? "");
-  }, [inputId, selected?.id, selected?.name]);
-
-  const filtered = useMemo(() => {
-    const trimmed = query.trim().toLowerCase();
-    const matches = trimmed
-      ? catalog.filter(
-          (tile) =>
-            tile.name.toLowerCase().includes(trimmed) ||
-            tile.supplier.toLowerCase().includes(trimmed),
-        )
-      : catalog;
-    const selectedTile = value
-      ? catalog.find((tile) => tile.id === value)
-      : undefined;
-    if (selectedTile && !matches.some((tile) => tile.id === selectedTile.id)) {
-      return [selectedTile, ...matches];
-    }
-    return matches;
-  }, [catalog, query, value]);
+  const options = catalog;
 
   return (
     <div className="space-y-2" data-tile-search={inputId}>
       <Input
         id={`${inputId}-search`}
-        name={`${inputId}-search`}
+        autoComplete="off"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Ieškoti plytelės…"
-        autoComplete="off"
         className={cn("h-10 bg-paper", className)}
       />
       <select
         id={inputId}
         name={fieldName ?? inputId}
         form={form}
-        value={value}
+        defaultValue={value}
+        data-line-tile={fieldName}
         onChange={(event) => {
-          const tileId = event.target.value;
-          if (tileId) onChange(tileId);
+          onChange(event.target.value);
         }}
         className={cn(
           "flex h-10 w-full rounded-md border border-input bg-paper px-3 text-sm",
@@ -75,7 +52,7 @@ export function TileSearchSelect({
         )}
       >
         <option value="">Pasirinkite plytelę</option>
-        {filtered.map((tile) => (
+        {options.map((tile) => (
           <option key={`${inputId}-${tile.id}`} value={tile.id}>
             {tile.name}
             {tile.supplier ? ` · ${tile.supplier}` : ""}

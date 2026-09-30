@@ -385,31 +385,54 @@ function readInputValue(id: string): string | null {
   return null;
 }
 
+function readLineTileValues(): Map<number, string> {
+  const values = new Map<number, string>();
+  if (typeof document === "undefined") return values;
+  document.querySelectorAll("select[name^='lineTile-']").forEach((element) => {
+    if (!(element instanceof HTMLSelectElement)) return;
+    const match = /^lineTile-(\d+)$/.exec(element.name);
+    if (!match) return;
+    values.set(Number(match[1]), element.value.trim());
+  });
+  return values;
+}
+
 function readProposalFromDom(current: Proposal): Proposal {
   if (typeof document === "undefined") return current;
 
-  const tileLines = current.tileLines.map((line, index) => {
-    const select = document.querySelector(
-      `select[name="lineTile-${index}"]`,
-    ) as HTMLSelectElement | null;
-    const quantityInput = document.getElementById(
-      `quantity-${line.id}`,
-    ) as HTMLInputElement | null;
-    const quantity = quantityInput ? Number(quantityInput.value) : line.quantity;
-    return {
-      ...line,
-      tileId: select?.value?.trim() || line.tileId,
-      quantity:
-        Number.isFinite(quantity) && quantity > 0 ? quantity : line.quantity,
-    };
-  });
+  const selectedTiles = readLineTileValues();
+  const lastIndex = Math.max(
+    current.tileLines.length - 1,
+    ...selectedTiles.keys(),
+    -1,
+  );
+  const tileLines: TileLine[] = [];
 
-  for (let index = tileLines.length; index < 10; index += 1) {
-    const select = document.querySelector(
-      `select[name="lineTile-${index}"]`,
-    ) as HTMLSelectElement | null;
-    if (!select) break;
-    tileLines.push(createEmptyTileLine(select.value || undefined));
+  for (let index = 0; index <= lastIndex; index += 1) {
+    const existing = current.tileLines[index];
+    const tileId = selectedTiles.has(index)
+      ? (selectedTiles.get(index) ?? "")
+      : (existing?.tileId || "");
+    const quantityInput = (
+      existing
+        ? document.getElementById(`quantity-${existing.id}`)
+        : document.querySelector(`input[name="lineQty-${index}"]`)
+    ) as HTMLInputElement | null;
+    const parsedQuantity = quantityInput
+      ? Number(quantityInput.value)
+      : existing?.quantity;
+    const quantity =
+      parsedQuantity !== undefined &&
+      Number.isFinite(parsedQuantity) &&
+      parsedQuantity > 0
+        ? parsedQuantity
+        : (existing?.quantity ?? 1);
+
+    tileLines.push(
+      existing
+        ? { ...existing, tileId, quantity }
+        : { ...createEmptyTileLine(tileId), quantity },
+    );
   }
 
   return {
@@ -535,14 +558,17 @@ export function ProposalCreator({
     });
   }, [proposal.tileLines.length]);
 
-  const validationErrors = useMemo(() => validateProposal(proposal), [proposal]);
+  const validationErrors = useMemo(
+    () => validateProposal(proposal, catalog),
+    [proposal, catalog],
+  );
 
   const persistProposal = async (
     nextStatus: "draft" | "sent" | "confirm",
   ): Promise<string | null> => {
     const synced = readProposalFromDom(proposal);
     setProposal(synced);
-    const errors = validateProposal(synced);
+    const errors = validateProposal(synced, catalog);
     if (errors.length > 0) {
       setFormError(errors[0]);
       return null;
@@ -643,7 +669,7 @@ export function ProposalCreator({
 
     const synced = readProposalFromDom(proposal);
     setProposal(synced);
-    const errors = validateProposal(synced);
+    const errors = validateProposal(synced, catalog);
     if (errors.length > 0) {
       setFormError(errors[0]);
       setDownloadError(errors[0]);
