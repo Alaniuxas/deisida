@@ -44,11 +44,11 @@ function compareDeadlines(a: Date | string, b: Date | string): number {
 }
 
 export function computeJobDurationHours(
-  job: Pick<QueueJob, "quantityPieces" | "tileWidthMm">,
+  job: Pick<QueueJob, "quantityPallets" | "tileWidthMm">,
   machine: Pick<Machine, "currentWidthMm" | "dailyRatePieces" | "changeoverMinutes">,
-): { durationHours: number; changeoverHours: number } {
+): { durationHours: number; changeoverHours: number; productionHours: number } {
   const productionHours =
-    (job.quantityPieces / machine.dailyRatePieces) * HOURS_PER_DAY;
+    (job.quantityPallets / machine.dailyRatePieces) * HOURS_PER_DAY;
   const changeoverHours =
     job.tileWidthMm === machine.currentWidthMm
       ? 0
@@ -57,6 +57,7 @@ export function computeJobDurationHours(
   return {
     durationHours: productionHours + changeoverHours,
     changeoverHours,
+    productionHours,
   };
 }
 
@@ -238,7 +239,7 @@ export function scheduleQueue(
         proposalId: job.proposalId,
         cutType: job.cutType,
         tileWidthMm: job.tileWidthMm,
-        quantityPieces: job.quantityPieces,
+        quantityPallets: job.quantityPallets,
         durationHours,
         changeoverHours,
         estimatedStart,

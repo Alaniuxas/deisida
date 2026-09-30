@@ -38,7 +38,7 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 | `/plyteliu-baras` | admin, pardavimai | Tile catalog (~296 from Bricks import) |
 | `/pasiulymai/naujas` | admin, pardavimai | Create proposal (catalog from Bricks import) |
 | `/pasiulymai/[id]` | admin, pardavimai | Edit / save / confirm proposal |
-| `/eile` | admin, pardavimai | Production queue (scheduleQueue planner) |
+| `/eile` | admin, pardavimai, cechas | Production queue by KONV/KNEW lane (width → deadline) |
 | `/cechas` | admin, cechas | Next job, pallet log, finish |
 | `/admin/konvejeriai` | admin | Machine assignments + KONV/KNEW settings |
 
@@ -58,6 +58,7 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 - Machines: **KONV** 240/day, **KNEW** 720/day; rotacija 4 val. (editable in `/admin/konvejeriai`)
 - Proposal form includes **adresas** (object address), persisted on `proposals.address`
 - `/eile`, `/cechas`, `/admin/konvejeriai` load data server-side (no client fetch/HMR dependency behind Cloudflare tunnel)
+- Gamybos eilė: `scheduleQueue` priskiria KONV/KNEW pagal plytos plotį (skirtingi plotiai viename užsakyme → skirtingi konvejeriai); eilėje rodoma 240/720 pal./d., reguliavimas 30 min., rotacija 4 val.
 - Login `/prisijungti` uses native form POST (303 relative redirect; works without JS/HMR)
 - `/cechas` write actions (paletė, baigti, keisti įrenginį) use native `<form method="post">` + 303 redirect
 - Patvirtinti → one gamybos darbas per plytelių eilutė (E2: 2 tipai → 2 darbai)

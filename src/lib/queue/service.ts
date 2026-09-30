@@ -20,18 +20,23 @@ import {
 import type {
   QueueResponse,
   QueueWidthGroup,
+  QueueLane,
   NextJobResponse,
   ShopJob,
   ConveyorInfo,
   AssignmentsResponse,
   Person,
   Machine as AdminMachine,
+  JobScheduleInfo,
+  QueueJob as ApiQueueJob,
+  MachineCode,
 } from "@/lib/production-types";
 import type { PackagingOptions } from "@/lib/types";
 import { defaultPackaging } from "@/lib/types";
 
 export interface QueuedJob extends JobRow {
   tileName: string;
+  tileQuantityPerPallet: number;
   proposalNumber: string;
   clientName: string;
   object: string;
@@ -39,6 +44,15 @@ export interface QueuedJob extends JobRow {
   pjovimas: string;
   packaging: PackagingOptions;
   tileHeightMm: number;
+}
+
+interface BuiltSchedule {
+  assignments: ReturnType<typeof scheduleQueue>;
+  machineRows: (typeof machines.$inferSelect)[];
+  machineCodeById: Map<string, MachineCode>;
+  machineById: Map<string, typeof machines.$inferSelect>;
+  assignmentMap: Map<string, ReturnType<typeof scheduleQueue>[number]>;
+  jobRows: QueuedJob[];
 }
 
 function parsePackaging(json: string): PackagingOptions {
@@ -55,6 +69,7 @@ async function loadQueuedJobs(): Promise<QueuedJob[]> {
     .select({
       job: jobs,
       tileName: tiles.name,
+      tileQuantityPerPallet: tiles.quantityPerPallet,
       tileHeightMm: tiles.heightMm,
       proposalNumber: proposals.number,
       clientName: proposals.clientName,
@@ -72,6 +87,7 @@ async function loadQueuedJobs(): Promise<QueuedJob[]> {
   return rows.map((row) => ({
     ...row.job,
     tileName: row.tileName,
+    tileQuantityPerPallet: row.tileQuantityPerPallet,
     proposalNumber: row.proposalNumber,
     clientName: row.clientName,
     object: row.object,
@@ -80,6 +96,16 @@ async function loadQueuedJobs(): Promise<QueuedJob[]> {
     packaging: parsePackaging(row.packagingJson),
     tileHeightMm: row.tileHeightMm,
   }));
+}
+
+function toPalletCount(job: QueuedJob): number {
+  if (job.quantityUnit === "pallets") {
+    return job.quantity;
+  }
+  if (job.tileQuantityPerPallet > 0) {
+    return job.quantity / job.tileQuantityPerPallet;
+  }
+  return job.pieceCount;
 }
 
 function toPlannerMachines(
@@ -97,78 +123,277 @@ function toPlannerJobs(jobRows: QueuedJob[]): PlannerJob[] {
   return jobRows.map((job) => ({
     id: job.id,
     tileWidthMm: job.widthMm,
-    quantityPieces: job.pieceCount,
+    quantityPallets: toPalletCount(job),
     deadline: job.deadline,
     cutType: job.pjovimas,
     proposalId: job.proposalId,
   }));
 }
 
-export async function getScheduledQueue(): Promise<QueueResponse> {
+function deriveMachineWidthMm(
+  machine: (typeof machines.$inferSelect),
+  machineJobs: QueuedJob[],
+): number {
+  if (machine.currentWidthMm && machine.currentWidthMm > 0) {
+    return machine.currentWidthMm;
+  }
+
+  const inProgress = machineJobs.find((job) => job.status === "in_progress");
+  if (inProgress) {
+    return inProgress.widthMm;
+  }
+
+  return 0;
+}
+
+function buildAssignmentReason(
+  job: QueuedJob,
+  machine: (typeof machines.$inferSelect),
+  machineCurrentWidthMm: number,
+  requiresChangeover: boolean,
+  splitProposalWidths: Set<string>,
+): string {
+  const proposalKey = job.proposalId;
+  const widthMatches =
+    machineCurrentWidthMm > 0 && job.widthMm === machineCurrentWidthMm;
+
+  if (splitProposalWidths.has(proposalKey)) {
+    return `Užsakyme keli plytų plotiai — priskirta ${machine.code}, kad nereikėtų reguliuoti konvejerio.`;
+  }
+
+  if (widthMatches) {
+    return `Konvejeris ${machine.code} jau sureguliuotas ${job.widthMm} mm pločiui — prioritetas pagal plotį, tada terminą.`;
+  }
+
+  if (requiresChangeover && machineCurrentWidthMm > 0) {
+    return `Po šio darbo reikės reguliuoti konvejerį iš ${machineCurrentWidthMm} mm į ${job.widthMm} mm (+${DEFAULT_CHANGEOVER_MINUTES} min.).`;
+  }
+
+  if (machineCurrentWidthMm === 0) {
+    return `Konvejeris ${machine.code} dar nereguliuotas — darbas planuojamas pagal ${job.widthMm} mm plotį ir terminą.`;
+  }
+
+  return `Priskirta ${machine.code} pagal eilės tvarką (plotis ${job.widthMm} mm, terminas).`;
+}
+
+async function buildSchedule(): Promise<BuiltSchedule | null> {
   const [jobRows, machineRows] = await Promise.all([
     loadQueuedJobs(),
     db.select().from(machines).orderBy(asc(machines.code)),
   ]);
 
   if (jobRows.length === 0) {
-    return { groups: [] };
+    return null;
   }
+
+  const machineCodeById = new Map(
+    machineRows.map((machine) => [machine.id, machine.code as MachineCode]),
+  );
+  const machineById = new Map(machineRows.map((machine) => [machine.id, machine]));
 
   const assignments = scheduleQueue(
     toPlannerMachines(machineRows),
     toPlannerJobs(jobRows),
   );
 
-  const machineCodeById = new Map(
-    machineRows.map((machine) => [machine.id, machine.code as "KONV" | "KNEW"]),
-  );
-
   const assignmentMap = new Map(
     assignments.map((assignment) => [assignment.jobId, assignment]),
   );
 
-  const grouped = new Map<number, QueueWidthGroup>();
+  return {
+    assignments,
+    machineRows,
+    machineCodeById,
+    machineById,
+    assignmentMap,
+    jobRows,
+  };
+}
+
+function toJobScheduleInfo(
+  job: QueuedJob,
+  assignment: ReturnType<typeof scheduleQueue>[number],
+  machine: (typeof machines.$inferSelect),
+  positionInQueue: number,
+  assignmentReason: string,
+): JobScheduleInfo {
+  const productionHours = assignment.durationHours - assignment.changeoverHours;
+
+  return {
+    widthMm: job.widthMm,
+    deadline: job.deadline,
+    conveyorCode: machine.code as MachineCode,
+    conveyorName: machine.title,
+    machineCurrentWidthMm: machine.currentWidthMm ?? 0,
+    dailyRatePallets: machine.dailyRate,
+    rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
+    changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
+    quantityPallets: toPalletCount(job),
+    productionHours,
+    changeoverHours: assignment.changeoverHours,
+    durationHours: assignment.durationHours,
+    estimatedStart: assignment.estimatedStart.toISOString(),
+    estimatedEnd: assignment.estimatedEnd.toISOString(),
+    positionInQueue,
+    requiresChangeover: assignment.changeoverHours > 0,
+    assignmentReason,
+  };
+}
+
+function toApiQueueJob(
+  job: QueuedJob,
+  schedule?: JobScheduleInfo,
+): ApiQueueJob {
+  return {
+    id: job.id,
+    tileName: job.tileName,
+    proposalNumber: job.proposalNumber,
+    client: job.clientName,
+    object: job.object,
+    deadline: job.deadline,
+    storisMm: job.tileHeightMm,
+    widthMm: job.widthMm,
+    quantityPlanned: job.quantity,
+    quantityUnit: job.quantityUnit as "pieces" | "pallets",
+    conveyorCode: schedule?.conveyorCode,
+    schedule,
+  };
+}
+
+function detectSplitProposalWidths(jobRows: QueuedJob[]): Set<string> {
+  const widthsByProposal = new Map<string, Set<number>>();
 
   for (const job of jobRows) {
-    const assignment = assignmentMap.get(job.id);
-    const widthMm = job.widthMm;
-    const group = grouped.get(widthMm) ?? { widthMm, jobs: [] };
-    const conveyorCode = assignment
-      ? machineCodeById.get(assignment.machineId)
-      : undefined;
+    const widths = widthsByProposal.get(job.proposalId) ?? new Set<number>();
+    widths.add(job.widthMm);
+    widthsByProposal.set(job.proposalId, widths);
+  }
 
-    group.jobs.push({
-      id: job.id,
-      tileName: job.tileName,
-      proposalNumber: job.proposalNumber,
-      client: job.clientName,
-      object: job.object,
-      deadline: job.deadline,
-      storisMm: job.tileHeightMm,
-      quantityPlanned: job.quantity,
-      quantityUnit: job.quantityUnit as "pieces" | "pallets",
-      conveyorCode,
+  const split = new Set<string>();
+  for (const [proposalId, widths] of widthsByProposal) {
+    if (widths.size > 1) {
+      split.add(proposalId);
+    }
+  }
+
+  return split;
+}
+
+function sortJobsForLane(
+  laneJobs: { job: QueuedJob; assignment: ReturnType<typeof scheduleQueue>[number] }[],
+  machineCurrentWidthMm: number,
+): { job: QueuedJob; assignment: ReturnType<typeof scheduleQueue>[number] }[] {
+  return [...laneJobs].sort((left, right) => {
+    const leftInProgress = left.job.status === "in_progress" ? 0 : 1;
+    const rightInProgress = right.job.status === "in_progress" ? 0 : 1;
+    if (leftInProgress !== rightInProgress) {
+      return leftInProgress - rightInProgress;
+    }
+
+    const leftWidthMatch =
+      left.job.widthMm === machineCurrentWidthMm && machineCurrentWidthMm > 0
+        ? 0
+        : 1;
+    const rightWidthMatch =
+      right.job.widthMm === machineCurrentWidthMm && machineCurrentWidthMm > 0
+        ? 0
+        : 1;
+    if (leftWidthMatch !== rightWidthMatch) {
+      return leftWidthMatch - rightWidthMatch;
+    }
+
+    if (left.job.widthMm !== right.job.widthMm) {
+      return left.job.widthMm - right.job.widthMm;
+    }
+
+    return (
+      new Date(left.job.deadline).getTime() -
+      new Date(right.job.deadline).getTime()
+    );
+  });
+}
+
+export async function getScheduledQueue(): Promise<QueueResponse> {
+  const built = await buildSchedule();
+  if (!built) {
+    return { lanes: [], groups: [] };
+  }
+
+  const splitProposalWidths = detectSplitProposalWidths(built.jobRows);
+  const lanes: QueueLane[] = [];
+  const grouped = new Map<number, QueueWidthGroup>();
+
+  for (const machine of built.machineRows) {
+    const machineJobs = built.jobRows
+      .map((job) => {
+        const assignment = built.assignmentMap.get(job.id);
+        if (!assignment || assignment.machineId !== machine.id) {
+          return null;
+        }
+        return { job, assignment };
+      })
+      .filter(
+        (
+          item,
+        ): item is {
+          job: QueuedJob;
+          assignment: ReturnType<typeof scheduleQueue>[number];
+        } => item !== null,
+      );
+
+    const machineCurrentWidthMm = deriveMachineWidthMm(machine, machineJobs.map((item) => item.job));
+    const ordered = sortJobsForLane(machineJobs, machineCurrentWidthMm);
+
+    const laneJobs: ApiQueueJob[] = ordered.map(({ job, assignment }, index) => {
+      const requiresChangeover = assignment.changeoverHours > 0;
+      const assignmentReason = buildAssignmentReason(
+        job,
+        machine,
+        machineCurrentWidthMm,
+        requiresChangeover,
+        splitProposalWidths,
+      );
+      const schedule = toJobScheduleInfo(
+        job,
+        assignment,
+        machine,
+        index + 1,
+        assignmentReason,
+      );
+      const apiJob = toApiQueueJob(job, schedule);
+
+      const widthGroup = grouped.get(job.widthMm) ?? { widthMm: job.widthMm, jobs: [] };
+      widthGroup.jobs.push(apiJob);
+      grouped.set(job.widthMm, widthGroup);
+
+      return apiJob;
     });
 
-    grouped.set(widthMm, group);
+    lanes.push({
+      code: machine.code as MachineCode,
+      name: machine.title,
+      currentWidthMm: machineCurrentWidthMm,
+      dailyRatePallets: machine.dailyRate,
+      rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
+      changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
+      jobs: laneJobs,
+    });
   }
 
   const groups = [...grouped.values()].sort((a, b) => a.widthMm - b.widthMm);
   for (const group of groups) {
     group.jobs.sort((left, right) => {
-      const leftAssignment = assignmentMap.get(left.id);
-      const rightAssignment = assignmentMap.get(right.id);
-      if (leftAssignment && rightAssignment) {
-        return (
-          leftAssignment.estimatedStart.getTime() -
-          rightAssignment.estimatedStart.getTime()
-        );
+      if (left.schedule && right.schedule) {
+        const leftStart = new Date(left.schedule.estimatedStart).getTime();
+        const rightStart = new Date(right.schedule.estimatedStart).getTime();
+        if (leftStart !== rightStart) return leftStart - rightStart;
       }
+      if (left.widthMm !== right.widthMm) return left.widthMm - right.widthMm;
       return new Date(left.deadline).getTime() - new Date(right.deadline).getTime();
     });
   }
 
-  return { groups };
+  return { lanes, groups };
 }
 
 async function countLoggedQuantity(jobId: string): Promise<number> {
@@ -179,7 +404,11 @@ async function countLoggedQuantity(jobId: string): Promise<number> {
   return logs.reduce((sum, log) => sum + log.quantity, 0);
 }
 
-function toShopJob(job: QueuedJob, quantityLogged: number): ShopJob {
+function toShopJob(
+  job: QueuedJob,
+  quantityLogged: number,
+  schedule?: JobScheduleInfo,
+): ShopJob {
   const quantityPlanned =
     job.quantityUnit === "pallets" ? job.quantity : job.pieceCount;
   const remaining = Math.max(0, quantityPlanned - quantityLogged);
@@ -198,6 +427,7 @@ function toShopJob(job: QueuedJob, quantityLogged: number): ShopJob {
     object: job.object,
     address: job.address,
     pjovimas: job.pjovimas,
+    schedule,
   };
 }
 
@@ -215,31 +445,36 @@ export async function getNextJobForUser(userId: string): Promise<NextJobResponse
     return { conveyor: null, job: null };
   }
 
+  const machine = assignment.machine;
   const conveyor: ConveyorInfo = {
-    id: assignment.machine.id,
-    code: assignment.machine.code as "KONV" | "KNEW",
-    name: assignment.machine.title,
+    id: machine.id,
+    code: machine.code as MachineCode,
+    name: machine.title,
+    currentWidthMm: machine.currentWidthMm ?? 0,
+    dailyRatePallets: machine.dailyRate,
+    rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
+    changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
   };
 
   const queue = await getScheduledQueue();
-  const machineJobs =
-    queue.groups
-      .flatMap((group) => group.jobs)
-      .filter((job) => job.conveyorCode === conveyor.code) ?? [];
+  const lane = queue.lanes.find((item) => item.code === conveyor.code);
+  const nextQueued = lane?.jobs[0];
 
-  const nextJobId = machineJobs[0]?.id;
-  if (!nextJobId) {
+  if (!nextQueued?.id) {
     return { conveyor, job: null };
   }
 
   const allJobs = await loadQueuedJobs();
-  const job = allJobs.find((item) => item.id === nextJobId);
+  const job = allJobs.find((item) => item.id === nextQueued.id);
   if (!job) {
     return { conveyor, job: null };
   }
 
   const quantityLogged = await countLoggedQuantity(job.id);
-  return { conveyor, job: toShopJob(job, quantityLogged) };
+  return {
+    conveyor,
+    job: toShopJob(job, quantityLogged, nextQueued.schedule),
+  };
 }
 
 export async function logJobPallet(
@@ -267,7 +502,12 @@ export async function logJobPallet(
   }
 
   const quantityLogged = await countLoggedQuantity(jobId);
-  return toShopJob(job, quantityLogged);
+  const queue = await getScheduledQueue();
+  const schedule = queue.lanes
+    .flatMap((lane) => lane.jobs)
+    .find((queued) => queued.id === jobId)?.schedule;
+
+  return toShopJob(job, quantityLogged, schedule);
 }
 
 export async function finishJob(
@@ -344,7 +584,7 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
 
   const adminMachines: AdminMachine[] = machineRows.map((machine) => ({
     id: machine.id,
-    code: machine.code as "KONV" | "KNEW",
+    code: machine.code as MachineCode,
     name: machine.title,
     dailyRatePallets: machine.dailyRate,
     rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
@@ -357,7 +597,7 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
 
 export async function switchWorkerConveyor(
   userId: string,
-  machineCode: "KONV" | "KNEW",
+  machineCode: MachineCode,
 ): Promise<NextJobResponse> {
   const data = await getAssignments();
   const target = data.machines.find((machine) => machine.code === machineCode);

@@ -4,6 +4,10 @@ export interface ConveyorInfo {
   id: string;
   code: MachineCode;
   name: string;
+  currentWidthMm?: number;
+  dailyRatePallets?: number;
+  rotationHours?: number;
+  changeoverMinutes?: number;
 }
 
 export interface JobPackaging {
@@ -15,6 +19,26 @@ export interface JobPackaging {
   bottomInterlayer?: boolean;
   rowInterlayer?: boolean;
   summary?: string[];
+}
+
+export interface JobScheduleInfo {
+  widthMm: number;
+  deadline: string;
+  conveyorCode: MachineCode;
+  conveyorName: string;
+  machineCurrentWidthMm: number;
+  dailyRatePallets: number;
+  rotationHours: number;
+  changeoverMinutes: number;
+  quantityPallets: number;
+  productionHours: number;
+  changeoverHours: number;
+  durationHours: number;
+  estimatedStart: string;
+  estimatedEnd: string;
+  positionInQueue: number;
+  requiresChangeover: boolean;
+  assignmentReason: string;
 }
 
 export interface ShopJob {
@@ -31,6 +55,7 @@ export interface ShopJob {
   object?: string;
   address?: string;
   pjovimas?: string;
+  schedule?: JobScheduleInfo;
 }
 
 export interface NextJobResponse {
@@ -56,9 +81,11 @@ export interface QueueJob {
   object?: string;
   deadline: string;
   storisMm: number;
+  widthMm: number;
   quantityPlanned: number;
   quantityUnit: "pallets" | "pieces";
   conveyorCode?: MachineCode;
+  schedule?: JobScheduleInfo;
 }
 
 export interface QueueWidthGroup {
@@ -66,7 +93,18 @@ export interface QueueWidthGroup {
   jobs: QueueJob[];
 }
 
+export interface QueueLane {
+  code: MachineCode;
+  name: string;
+  currentWidthMm: number;
+  dailyRatePallets: number;
+  rotationHours: number;
+  changeoverMinutes: number;
+  jobs: QueueJob[];
+}
+
 export interface QueueResponse {
+  lanes: QueueLane[];
   groups: QueueWidthGroup[];
 }
 

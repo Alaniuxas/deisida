@@ -58,7 +58,7 @@ export default async function CechasPage({
       title="Cechas"
       subtitle={
         conveyor
-          ? `Jūsų konvejeris: ${conveyor.name} (${conveyor.code})`
+          ? `Jūsų konvejeris: ${conveyor.name} (${conveyor.code}) · ${conveyor.dailyRatePallets ?? "—"} pal./d. · rotacija ${conveyor.rotationHours ?? "—"} val.`
           : "Kitas darbas jūsų konvejeryje"
       }
     >

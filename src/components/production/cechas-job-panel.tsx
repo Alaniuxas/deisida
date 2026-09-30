@@ -1,8 +1,23 @@
-import { Package, Ruler, Layers, MapPin, Scissors } from "lucide-react";
+import {
+  Package,
+  Ruler,
+  Layers,
+  MapPin,
+  Scissors,
+  CalendarDays,
+  Cog,
+  Clock,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatPackagingLines } from "@/lib/packaging-labels";
+import {
+  formatDeadlineDate,
+  formatDurationHours,
+  formatScheduleTimestamp,
+} from "@/lib/queue/format";
 import type { ShopJob } from "@/lib/production-types";
 
 function quantityLabel(unit: ShopJob["quantityUnit"], count: number): string {
@@ -20,6 +35,7 @@ interface CechasJobPanelProps {
 
 export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
   const packagingLines = formatPackagingLines(job.packaging);
+  const schedule = job.schedule;
   const completionPercent =
     job.quantityPlanned > 0
       ? Math.round((job.quantityLogged / job.quantityPlanned) * 100)
@@ -42,13 +58,28 @@ export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
 
       <Card className="paper-shadow rounded-2xl border-stone-line">
         <CardHeader className="gap-2 border-b border-stone-line pb-4">
-          <p className="text-sm font-medium text-muted-foreground">
-            Artimiausias darbas jūsų įrenginyje
-            {job.proposalNumber ? ` · ${job.proposalNumber}` : ""}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium text-muted-foreground">
+              Artimiausias darbas jūsų įrenginyje
+              {job.proposalNumber ? ` · ${job.proposalNumber}` : ""}
+            </p>
+            {schedule ? (
+              <>
+                <Badge className="bg-deisida text-deisida-foreground">
+                  {schedule.conveyorCode}
+                </Badge>
+                <Badge variant="outline">#{schedule.positionInQueue} eilėje</Badge>
+              </>
+            ) : null}
+          </div>
           <CardTitle className="text-2xl font-semibold leading-tight">
             {job.tileName}
           </CardTitle>
+          {schedule?.assignmentReason ? (
+            <p className="rounded-xl bg-muted/60 px-3 py-2 text-sm leading-relaxed">
+              {schedule.assignmentReason}
+            </p>
+          ) : null}
           {(job.client || job.object) && (
             <p className="text-base text-muted-foreground">
               {[job.client, job.object].filter(Boolean).join(" · ")}
@@ -63,11 +94,25 @@ export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
         </CardHeader>
         <CardContent className="space-y-5 pt-5">
           <div className="grid gap-4 sm:grid-cols-2">
+            {schedule ? (
+              <InfoRow
+                icon={<Ruler className="size-5 text-deisida" />}
+                label="Plytos plotis"
+                value={`${schedule.widthMm} mm`}
+              />
+            ) : null}
             <InfoRow
               icon={<Ruler className="size-5 text-deisida" />}
               label="Pjovimo storis"
               value={`${job.storisMm} mm`}
             />
+            {schedule ? (
+              <InfoRow
+                icon={<CalendarDays className="size-5 text-deisida" />}
+                label="Terminas"
+                value={formatDeadlineDate(schedule.deadline)}
+              />
+            ) : null}
             <InfoRow
               icon={<Scissors className="size-5 text-deisida" />}
               label="Pjūvis (baras)"
@@ -90,6 +135,50 @@ export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
               highlight
             />
           </div>
+
+          {schedule ? (
+            <div className="rounded-xl border border-stone-line bg-muted/30 px-4 py-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Cog className="size-4" />
+                Gamybos planas ({schedule.conveyorCode})
+              </div>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <PlanItem
+                  label="Našumas"
+                  value={`${schedule.dailyRatePallets} pal./d.`}
+                />
+                <PlanItem
+                  label="Pjovimas"
+                  value={formatDurationHours(schedule.productionHours)}
+                />
+                <PlanItem
+                  label="Reguliavimas"
+                  value={
+                    schedule.requiresChangeover
+                      ? formatDurationHours(schedule.changeoverHours)
+                      : "Nereikia"
+                  }
+                />
+                <PlanItem
+                  label="Viso laikas"
+                  value={formatDurationHours(schedule.durationHours)}
+                />
+                <PlanItem
+                  label="Planuojama pradžia"
+                  value={formatScheduleTimestamp(schedule.estimatedStart)}
+                />
+                <PlanItem
+                  label="Planuojama pabaiga"
+                  value={formatScheduleTimestamp(schedule.estimatedEnd)}
+                />
+                <PlanItem
+                  icon={<Clock className="size-3.5" />}
+                  label="Rotacija"
+                  value={`${schedule.rotationHours} val.`}
+                />
+              </dl>
+            </div>
+          ) : null}
 
           <div className="rounded-xl bg-muted/60 px-4 py-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -165,6 +254,26 @@ export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
           </form>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function PlanItem({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <dt className="flex items-center gap-1 text-muted-foreground">
+        {icon}
+        {label}
+      </dt>
+      <dd className="text-base font-medium text-ink">{value}</dd>
     </div>
   );
 }

@@ -10,7 +10,7 @@ export interface Machine {
 export interface QueueJob {
   id: string;
   tileWidthMm: number;
-  quantityPieces: number;
+  quantityPallets: number;
   deadline: Date | string;
   cutType: CutType;
   proposalId: string;
@@ -22,7 +22,7 @@ export interface Assignment {
   proposalId: string;
   cutType: CutType;
   tileWidthMm: number;
-  quantityPieces: number;
+  quantityPallets: number;
   durationHours: number;
   changeoverHours: number;
   estimatedStart: Date;

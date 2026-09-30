@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getScheduledQueue } from "@/lib/queue/service";
-import { EileScreen } from "@/components/production/eile-screen";
+import { EileQueueView } from "@/components/production/eile-queue-view";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export default async function EilePage() {
     redirect("/pasiulymai");
   }
 
-  const initialData = await getScheduledQueue();
+  const queue = await getScheduledQueue();
 
-  return <EileScreen initialData={initialData} />;
+  return <EileQueueView data={queue} />;
 }
