@@ -69,6 +69,16 @@ export const TILE_CATALOG: Tile[] = [
   },
 ];
 
+let runtimeCatalog: Tile[] | null = null;
+
+export function setRuntimeCatalog(catalog: Tile[]): void {
+  runtimeCatalog = catalog;
+}
+
+export function getActiveCatalog(): Tile[] {
+  return runtimeCatalog ?? TILE_CATALOG;
+}
+
 export function getTileById(id: string): Tile | undefined {
-  return TILE_CATALOG.find((tile) => tile.id === id);
+  return getActiveCatalog().find((tile) => tile.id === id);
 }

@@ -31,10 +31,11 @@ export function createEmptyTileLine(tileId?: string, id?: string): TileLine {
   };
 }
 
-export function createDefaultProposal(): Proposal {
+export function createDefaultProposal(tileId?: string): Proposal {
   const today = new Date();
   const inMonth = new Date(today);
   inMonth.setDate(inMonth.getDate() + 30);
+  const fallbackTileId = tileId ?? getTileById("kolumba-k58")?.id ?? "kolumba-k58";
 
   return {
     number: generateProposalNumber(2),
@@ -45,7 +46,7 @@ export function createDefaultProposal(): Proposal {
     comment: "",
     pjovimas: PJUVIS_OPTIONS[0],
     packaging: defaultPackaging(),
-    tileLines: [createEmptyTileLine("kolumba-k58", "line-1")],
+    tileLines: [createEmptyTileLine(fallbackTileId, "line-1")],
     extraClauses: [],
   };
 }

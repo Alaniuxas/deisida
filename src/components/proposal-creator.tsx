@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { PackagingOptions, Proposal, QuantityUnit, TileLine } from "@/lib/types";
+import type {
+  PackagingOptions,
+  Proposal,
+  QuantityUnit,
+  Tile,
+  TileLine,
+} from "@/lib/types";
 import { PJUVIS_OPTIONS } from "@/lib/types";
 import {
   createDefaultProposal,
@@ -12,7 +18,9 @@ import {
   quantityUnitLabel,
   validateProposal,
 } from "@/lib/proposal-utils";
-import { TILE_CATALOG } from "@/lib/tiles";
+import { setRuntimeCatalog } from "@/lib/tiles";
+import { TileSearchSelect } from "@/components/tile-search-select";
+import { useRouter } from "next/navigation";
 import {
   downloadClientProposalPdf,
   downloadProductionProposalPdf,
@@ -187,17 +195,19 @@ function OrderPackagingEditor({
 function TileLineEditor({
   line,
   index,
+  catalog,
   onChange,
   onRemove,
   canRemove,
 }: {
   line: TileLine;
   index: number;
+  catalog: Tile[];
   onChange: (line: TileLine) => void;
   onRemove: () => void;
   canRemove: boolean;
 }) {
-  const tile = TILE_CATALOG.find((item) => item.id === line.tileId);
+  const tile = catalog.find((item) => item.id === line.tileId);
   const tileLabel = tile?.name ?? null;
 
   return (
@@ -213,24 +223,12 @@ function TileLineEditor({
 
       <div className="grid gap-x-4 gap-y-6 px-6 py-6 lg:px-10 xl:grid-cols-4">
         <FormField label="Plytelė">
-          <Select
+          <TileSearchSelect
             value={line.tileId}
-            onValueChange={(tileId) => {
-              if (!tileId) return;
-              onChange({ ...line, tileId });
-            }}
-          >
-            <SelectTrigger className={controlClass}>
-              <SelectDisplay value={tileLabel} />
-            </SelectTrigger>
-            <SelectContent>
-              {TILE_CATALOG.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            catalog={catalog}
+            onChange={(tileId) => onChange({ ...line, tileId })}
+            className={controlClass}
+          />
         </FormField>
 
         <FormField label={tile ? `Pjovimo storis · ${tile.heightMm} mm` : "Pjovimo storis"}>
@@ -320,8 +318,27 @@ function DownloadButtons({
   );
 }
 
-export function ProposalCreator() {
-  const [proposal, setProposal] = useState<Proposal>(() => createDefaultProposal());
+interface ProposalCreatorProps {
+  catalog: Tile[];
+  proposalId?: string;
+  initialProposal?: Proposal;
+  initialStatus?: string;
+}
+
+export function ProposalCreator({
+  catalog,
+  proposalId,
+  initialProposal,
+  initialStatus = "draft",
+}: ProposalCreatorProps) {
+  const router = useRouter();
+  const [savedId, setSavedId] = useState<string | undefined>(proposalId);
+  const [status, setStatus] = useState(initialStatus);
+  const [proposal, setProposal] = useState<Proposal>(
+    () => initialProposal ?? createDefaultProposal(catalog[0]?.id),
+  );
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [pdfState, setPdfState] = useState<"idle" | "loading" | "error">("idle");
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -331,6 +348,10 @@ export function ProposalCreator() {
   const [previewDoc, setPreviewDoc] = useState<PreviewDoc>("client");
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const pendingScrollLineIndex = useRef<number | null>(null);
+
+  useEffect(() => {
+    setRuntimeCatalog(catalog);
+  }, [catalog]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1279px)");
@@ -359,9 +380,85 @@ export function ProposalCreator() {
 
   const validationErrors = useMemo(() => validateProposal(proposal), [proposal]);
 
+  const persistProposal = async (
+    nextStatus: "draft" | "sent" | "confirm",
+  ): Promise<string | null> => {
+    const errors = validateProposal(proposal);
+    if (errors.length > 0) {
+      setFormError(errors[0]);
+      return null;
+    }
+
+    setSaveState("saving");
+    setSaveMessage(null);
+    setFormError(null);
+
+    try {
+      const response = await fetch(
+        savedId ? `/api/proposals/${savedId}` : "/api/proposals",
+        {
+          method: savedId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            proposal,
+            status: nextStatus === "confirm" ? "sent" : nextStatus,
+            id: savedId,
+          }),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "Nepavyko išsaugoti.");
+      }
+
+      const id = data.proposal?.id as string;
+      setSavedId(id);
+      if (nextStatus !== "confirm") {
+        setStatus(nextStatus);
+      }
+      setSaveState("saved");
+      setSaveMessage(
+        nextStatus === "draft"
+          ? "Juodraštis išsaugotas."
+          : nextStatus === "sent"
+            ? "Pasiūlymas pažymėtas kaip išsiųstas."
+            : "Patvirtinama…",
+      );
+
+      if (!savedId && id) {
+        router.replace(`/pasiulymai/${id}`);
+      }
+
+      if (nextStatus === "confirm" && id) {
+        const confirmResponse = await fetch(`/api/proposals/${id}/confirm`, {
+          method: "POST",
+        });
+        const confirmData = await confirmResponse.json();
+        if (!confirmResponse.ok) {
+          throw new Error(confirmData.error ?? "Nepavyko patvirtinti.");
+        }
+        setStatus("confirmed");
+        setSaveMessage(
+          `Pasiūlymas patvirtintas. Sukurta darbų: ${confirmData.jobsCreated ?? 0}.`,
+        );
+      }
+
+      return id;
+    } catch (error) {
+      setSaveState("error");
+      setSaveMessage(
+        error instanceof Error ? error.message : "Nepavyko išsaugoti.",
+      );
+      return null;
+    }
+  };
+
   const addTileLine = () => {
     setProposal((current) => {
-      const tileLines = [...current.tileLines, createEmptyTileLine()];
+      const tileLines = [
+        ...current.tileLines,
+        createEmptyTileLine(catalog[0]?.id),
+      ];
       pendingScrollLineIndex.current = tileLines.length - 1;
       return { ...current, tileLines };
     });
@@ -435,9 +532,37 @@ export function ProposalCreator() {
               type="button"
               variant="outline"
               className="h-10 border-stone-line bg-paper"
-              onClick={() => setProposal(createDefaultProposal())}
+              onClick={() =>
+                setProposal(createDefaultProposal(catalog[0]?.id))
+              }
             >
               Naujas pasiūlymas
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 border-stone-line bg-paper"
+              disabled={saveState === "saving" || status === "confirmed"}
+              onClick={() => persistProposal("draft")}
+            >
+              {saveState === "saving" ? "Saugoma…" : "Išsaugoti juodraštį"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 border-deisida-muted text-deisida-muted"
+              disabled={saveState === "saving" || status === "confirmed"}
+              onClick={() => persistProposal("sent")}
+            >
+              Pažymėti išsiųstu
+            </Button>
+            <Button
+              type="button"
+              className="h-10 bg-deisida text-deisida-foreground hover:bg-deisida/90"
+              disabled={saveState === "saving" || status === "confirmed"}
+              onClick={() => persistProposal("confirm")}
+            >
+              Patvirtinti
             </Button>
             <DownloadButtons
               onDownload={handleDownloadPdf}
@@ -445,6 +570,11 @@ export function ProposalCreator() {
             />
           </div>
         </div>
+        {saveMessage ? (
+          <div className="border-t border-stone-line bg-[#eef6ee] px-6 py-3 text-sm text-[#2d5a2d] lg:px-10">
+            {saveMessage}
+          </div>
+        ) : null}
         {downloadNote ? (
           <div className="border-t border-stone-line bg-[#eef6ee] px-6 py-3 text-sm text-[#2d5a2d] lg:px-10">
             {downloadNote}
@@ -569,6 +699,7 @@ export function ProposalCreator() {
                 key={line.id}
                 line={line}
                 index={index}
+                catalog={catalog}
                 onChange={(next) => updateLine(index, next)}
                 onRemove={() => removeTileLine(index)}
                 canRemove={proposal.tileLines.length > 1}

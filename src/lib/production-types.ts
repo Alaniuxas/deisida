@@ -1,0 +1,111 @@
+export type MachineCode = "KONV" | "KNEW";
+
+export interface ConveyorInfo {
+  id: string;
+  code: MachineCode;
+  name: string;
+}
+
+export interface JobPackaging {
+  packOnlyIntact?: boolean | null;
+  packTwoParts?: boolean | null;
+  packMoreThanTwoParts?: boolean | null;
+  needLeftovers?: boolean | null;
+  baseProtection?: boolean;
+  bottomInterlayer?: boolean;
+  rowInterlayer?: boolean;
+  summary?: string[];
+}
+
+export interface ShopJob {
+  id: string;
+  tileName: string;
+  storisMm: number;
+  quantityPlanned: number;
+  quantityLogged: number;
+  quantityUnit: "pallets" | "pieces";
+  remaining: number;
+  packaging: JobPackaging;
+  client?: string;
+  object?: string;
+}
+
+export interface NextJobResponse {
+  conveyor?: ConveyorInfo | null;
+  job?: ShopJob | null;
+}
+
+export interface FinishJobRequest {
+  reason?: string;
+}
+
+export interface FinishJobResponse {
+  ok: boolean;
+  completionPercent: number;
+  managerSignalSaved?: boolean;
+}
+
+export interface QueueJob {
+  id: string;
+  tileName: string;
+  client: string;
+  object?: string;
+  deadline: string;
+  storisMm: number;
+  quantityPlanned: number;
+  quantityUnit: "pallets" | "pieces";
+  conveyorCode?: MachineCode;
+}
+
+export interface QueueWidthGroup {
+  widthMm: number;
+  jobs: QueueJob[];
+}
+
+export interface QueueResponse {
+  groups: QueueWidthGroup[];
+}
+
+export interface Person {
+  id: string;
+  name: string;
+}
+
+export interface Machine {
+  id: string;
+  code: MachineCode;
+  name: string;
+  dailyRatePallets: number;
+  rotationHours: number;
+  currentWidthMm: number;
+  assignedPersonIds: string[];
+}
+
+export interface AssignmentsResponse {
+  people: Person[];
+  machines: Machine[];
+}
+
+export interface AssignmentsRequest {
+  assignments: { personId: string; machineId: string }[];
+}
+
+export interface MachinePatchRequest {
+  dailyRatePallets?: number;
+  rotationHours?: number;
+  currentWidthMm?: number;
+}
+
+export type ApiErrorKind = "not_found" | "network" | "server" | "unknown";
+
+export class ProductionApiError extends Error {
+  kind: ApiErrorKind;
+  status?: number;
+
+  constructor(message: string, kind: ApiErrorKind, status?: number) {
+    super(message);
+    this.name = "ProductionApiError";
+    this.kind = kind;
+    this.status = status;
+  }
+}
