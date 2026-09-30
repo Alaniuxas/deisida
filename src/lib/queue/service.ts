@@ -17,6 +17,10 @@ import {
   DEFAULT_CHANGEOVER_MINUTES,
   DEFAULT_ROTATION_HOURS,
 } from "@/lib/queue/constants";
+import {
+  getEffectiveMachineWidth,
+  machineWidthHint,
+} from "@/lib/queue/machine-width";
 import type {
   QueueResponse,
   QueueWidthGroup,
@@ -130,20 +134,14 @@ function toPlannerJobs(jobRows: QueuedJob[]): PlannerJob[] {
   }));
 }
 
-function deriveMachineWidthMm(
-  machine: (typeof machines.$inferSelect),
-  machineJobs: QueuedJob[],
-): number {
-  if (machine.currentWidthMm && machine.currentWidthMm > 0) {
-    return machine.currentWidthMm;
-  }
-
-  const inProgress = machineJobs.find((job) => job.status === "in_progress");
-  if (inProgress) {
-    return inProgress.widthMm;
-  }
-
-  return 0;
+function machineJobsForMachine(
+  built: BuiltSchedule,
+  machineId: string,
+): QueuedJob[] {
+  return built.jobRows.filter((job) => {
+    const assignment = built.assignmentMap.get(job.id);
+    return assignment?.machineId === machineId;
+  });
 }
 
 function buildAssignmentReason(
@@ -341,7 +339,11 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
         } => item !== null,
       );
 
-    const machineCurrentWidthMm = deriveMachineWidthMm(machine, machineJobs.map((item) => item.job));
+    const effectiveWidth = getEffectiveMachineWidth(
+      machine.currentWidthMm,
+      machineJobs.map((item) => item.job),
+    );
+    const machineCurrentWidthMm = effectiveWidth.widthMm;
     const ordered = sortJobsForLane(machineJobs, machineCurrentWidthMm);
 
     const laneJobs: ApiQueueJob[] = ordered.map(({ job, assignment }, index) => {
@@ -373,6 +375,8 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
       code: machine.code as MachineCode,
       name: machine.title,
       currentWidthMm: machineCurrentWidthMm,
+      widthSource: effectiveWidth.source,
+      widthHint: machineWidthHint(effectiveWidth),
       dailyRatePallets: machine.dailyRate,
       rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
       changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
@@ -446,18 +450,18 @@ export async function getNextJobForUser(userId: string): Promise<NextJobResponse
   }
 
   const machine = assignment.machine;
+  const queue = await getScheduledQueue();
+  const lane = queue.lanes.find((item) => item.code === machine.code);
+
   const conveyor: ConveyorInfo = {
     id: machine.id,
     code: machine.code as MachineCode,
     name: machine.title,
-    currentWidthMm: machine.currentWidthMm ?? 0,
+    currentWidthMm: lane?.currentWidthMm ?? machine.currentWidthMm ?? 0,
     dailyRatePallets: machine.dailyRate,
     rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
     changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
   };
-
-  const queue = await getScheduledQueue();
-  const lane = queue.lanes.find((item) => item.code === conveyor.code);
   const nextQueued = lane?.jobs[0];
 
   if (!nextQueued?.id) {
@@ -560,7 +564,7 @@ export async function finishJob(
 }
 
 export async function getAssignments(): Promise<AssignmentsResponse> {
-  const [peopleRows, machineRows, assignmentRows] = await Promise.all([
+  const [peopleRows, machineRows, assignmentRows, built] = await Promise.all([
     db
       .select()
       .from(users)
@@ -568,6 +572,7 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
       .orderBy(asc(users.name)),
     db.select().from(machines).orderBy(asc(machines.code)),
     db.select().from(machineAssignments),
+    buildSchedule(),
   ]);
 
   const people: Person[] = peopleRows.map((person) => ({
@@ -582,15 +587,26 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
     assignedByMachine.set(assignment.machineId, current);
   }
 
-  const adminMachines: AdminMachine[] = machineRows.map((machine) => ({
-    id: machine.id,
-    code: machine.code as MachineCode,
-    name: machine.title,
-    dailyRatePallets: machine.dailyRate,
-    rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
-    currentWidthMm: machine.currentWidthMm ?? 0,
-    assignedPersonIds: assignedByMachine.get(machine.id) ?? [],
-  }));
+  const adminMachines: AdminMachine[] = machineRows.map((machine) => {
+    const machineJobs = built ? machineJobsForMachine(built, machine.id) : [];
+    const effectiveWidth = getEffectiveMachineWidth(
+      machine.currentWidthMm,
+      machineJobs,
+    );
+
+    return {
+      id: machine.id,
+      code: machine.code as MachineCode,
+      name: machine.title,
+      dailyRatePallets: machine.dailyRate,
+      rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
+      currentWidthMm: effectiveWidth.widthMm,
+      storedWidthMm: machine.currentWidthMm ?? 0,
+      widthSource: effectiveWidth.source,
+      widthHint: machineWidthHint(effectiveWidth),
+      assignedPersonIds: assignedByMachine.get(machine.id) ?? [],
+    };
+  });
 
   return { people, machines: adminMachines };
 }

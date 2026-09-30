@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Users } from "lucide-react";
+import { Check, UserCheck, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -120,6 +120,16 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
     };
   }, [applyData, initialData]);
 
+  const personMachineCode = useMemo(() => {
+    const map = new Map<string, MachineCode>();
+    for (const machine of machines) {
+      for (const personId of draftAssignments[machine.id] ?? []) {
+        map.set(personId, machine.code);
+      }
+    }
+    return map;
+  }, [machines, draftAssignments]);
+
   const unassignedPeople = useMemo(() => {
     const assigned = new Set(
       Object.values(draftAssignments).flatMap((ids) => ids),
@@ -189,7 +199,7 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
         if (
           patch.dailyRatePallets !== machine.dailyRatePallets ||
           patch.rotationHours !== machine.rotationHours ||
-          patch.currentWidthMm !== machine.currentWidthMm
+          patch.currentWidthMm !== machine.storedWidthMm
         ) {
           latest = await patchMachine(machine.id, patch);
         }
@@ -222,6 +232,9 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
           dailyRatePallets: 0,
           rotationHours: 8,
           currentWidthMm: 0,
+          storedWidthMm: 0,
+          widthSource: "unset" as const,
+          widthHint: null,
           assignedPersonIds: [],
         }));
 
@@ -267,6 +280,9 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
                 currentWidthMm: String(machine.currentWidthMm),
               };
               const assignedIds = draftAssignments[machine.id] ?? [];
+              const assignedPeople = people.filter((person) =>
+                assignedIds.includes(person.id),
+              );
 
               return (
                 <Card
@@ -284,8 +300,36 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
                   <CardContent className="space-y-5 pt-5">
                     <div>
                       <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <UserCheck className="size-4" />
+                        Priskirta šiam konvejeriui
+                      </div>
+                      {assignedPeople.length > 0 ? (
+                        <div className="mb-4 flex flex-wrap gap-2">
+                          {assignedPeople.map((person) => (
+                            <button
+                              key={person.id}
+                              type="button"
+                              onClick={() => togglePerson(machine.id, person.id)}
+                              disabled={showEmptyMachines}
+                              className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-deisida px-4 text-base font-semibold text-deisida-foreground"
+                            >
+                              <Check className="size-4" />
+                              {person.name}
+                              <span className="text-sm font-normal opacity-80">
+                                · čia dirba
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mb-4 rounded-xl border border-dashed border-stone-line px-4 py-3 text-base text-muted-foreground">
+                          Dar niekas nepriskirtas {machine.code}.
+                        </p>
+                      )}
+
+                      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                         <Users className="size-4" />
-                        Šiandien dirba
+                        Priskirti arba perkelti
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {people.length === 0 ? (
@@ -295,6 +339,9 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
                         ) : (
                           people.map((person) => {
                             const selected = assignedIds.includes(person.id);
+                            const otherCode = personMachineCode.get(person.id);
+                            if (selected) return null;
+
                             return (
                               <button
                                 key={person.id}
@@ -303,13 +350,18 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
                                   togglePerson(machine.id, person.id)
                                 }
                                 disabled={showEmptyMachines}
-                                className={`min-h-12 rounded-xl px-4 text-base font-medium transition-colors ${
-                                  selected
-                                    ? "bg-deisida text-deisida-foreground"
-                                    : "bg-muted text-foreground hover:bg-muted/80"
-                                }`}
+                                className="min-h-12 rounded-xl border border-stone-line bg-paper px-4 text-base font-medium text-foreground hover:bg-muted/80"
                               >
                                 {person.name}
+                                {otherCode ? (
+                                  <span className="ml-2 text-sm text-muted-foreground">
+                                    (dabar {otherCode})
+                                  </span>
+                                ) : (
+                                  <span className="ml-2 text-sm text-muted-foreground">
+                                    (nepriskirta)
+                                  </span>
+                                )}
                               </button>
                             );
                           })
@@ -340,19 +392,26 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
                         }
                         disabled={showEmptyMachines}
                       />
-                      <Field
-                        id={`width-${machine.id}`}
-                        label="Dabartinis plotis (mm)"
-                        value={draft.currentWidthMm}
-                        onChange={(value) =>
-                          updateMachineDraft(
-                            machine.id,
-                            "currentWidthMm",
-                            value,
-                          )
-                        }
-                        disabled={showEmptyMachines}
-                      />
+                      <div className="space-y-2">
+                        <Field
+                          id={`width-${machine.id}`}
+                          label="Dabartinis plotis (mm)"
+                          value={draft.currentWidthMm}
+                          onChange={(value) =>
+                            updateMachineDraft(
+                              machine.id,
+                              "currentWidthMm",
+                              value,
+                            )
+                          }
+                          disabled={showEmptyMachines}
+                        />
+                        {machine.widthHint ? (
+                          <p className="text-sm text-muted-foreground">
+                            {machine.widthHint}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

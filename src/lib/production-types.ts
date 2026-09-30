@@ -1,5 +1,7 @@
 export type MachineCode = "KONV" | "KNEW";
 
+export type MachineWidthSource = "stored" | "in_progress" | "queued" | "unset";
+
 export interface ConveyorInfo {
   id: string;
   code: MachineCode;
@@ -97,6 +99,8 @@ export interface QueueLane {
   code: MachineCode;
   name: string;
   currentWidthMm: number;
+  widthSource: MachineWidthSource;
+  widthHint: string | null;
   dailyRatePallets: number;
   rotationHours: number;
   changeoverMinutes: number;
@@ -120,6 +124,9 @@ export interface Machine {
   dailyRatePallets: number;
   rotationHours: number;
   currentWidthMm: number;
+  storedWidthMm: number;
+  widthSource: MachineWidthSource;
+  widthHint: string | null;
   assignedPersonIds: string[];
 }
 

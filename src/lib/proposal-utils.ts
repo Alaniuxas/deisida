@@ -25,7 +25,7 @@ export function generateProposalNumber(sequence = 2): string {
 export function createEmptyTileLine(tileId?: string, id?: string): TileLine {
   return {
     id: id ?? `line-${crypto.randomUUID()}`,
-    tileId: tileId ?? TILE_FALLBACK_ID,
+    tileId: tileId ?? "",
     quantity: 1,
     quantityUnit: "pallets",
   };

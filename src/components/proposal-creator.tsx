@@ -224,6 +224,7 @@ function TileLineEditor({
       <div className="grid gap-x-4 gap-y-6 px-6 py-6 lg:px-10 xl:grid-cols-4">
         <FormField label="Plytelė">
           <TileSearchSelect
+            inputId={`tile-${line.id}`}
             value={line.tileId}
             catalog={catalog}
             onChange={(tileId) => onChange({ ...line, tileId })}
@@ -457,10 +458,7 @@ export function ProposalCreator({
 
   const addTileLine = () => {
     setProposal((current) => {
-      const tileLines = [
-        ...current.tileLines,
-        createEmptyTileLine(catalog[0]?.id),
-      ];
+      const tileLines = [...current.tileLines, createEmptyTileLine()];
       pendingScrollLineIndex.current = tileLines.length - 1;
       return { ...current, tileLines };
     });
@@ -725,25 +723,23 @@ export function ProposalCreator({
               Pjūviai ir pakavimas
             </h2>
             <div className="mb-8 max-w-xl">
-              <FormField label="Pjūviai (baras)">
-                <Select
+              <FormField label="Pjūviai (baras)" htmlFor="pjovimas">
+                <select
+                  id="pjovimas"
+                  name="pjovimas"
                   value={proposal.pjovimas}
-                  onValueChange={(pjovimas) => {
-                    if (!pjovimas) return;
-                    setProposal({ ...proposal, pjovimas });
-                  }}
+                  onChange={(event) =>
+                    setProposal({ ...proposal, pjovimas: event.target.value })
+                  }
+                  className={`${controlClass} rounded-md border border-input bg-paper px-3 text-sm`}
                 >
-                  <SelectTrigger className={controlClass}>
-                    <SelectDisplay value={proposal.pjovimas} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PJUVIS_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="" disabled>Pasirinkite pjūvį</option>
+                  {PJUVIS_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               </FormField>
             </div>
             <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.1em] text-deisida-muted">

@@ -8,6 +8,7 @@ import {
   formatDurationHours,
   formatScheduleTimestamp,
 } from "@/lib/queue/format";
+import { machineWidthLabel } from "@/lib/queue/machine-width";
 import type { QueueLane, QueueResponse } from "@/lib/production-types";
 
 interface EileQueueViewProps {
@@ -65,11 +66,15 @@ function LaneSection({ lane }: { lane: QueueLane }) {
         <Badge variant="outline">
           Reguliavimas {lane.changeoverMinutes} min.
         </Badge>
-        {lane.currentWidthMm > 0 ? (
-          <Badge variant="outline">Dabar {lane.currentWidthMm} mm</Badge>
-        ) : (
-          <Badge variant="outline">Plotis nereguliuotas</Badge>
-        )}
+        <Badge variant="outline">
+          {machineWidthLabel({
+            widthMm: lane.currentWidthMm,
+            source: lane.widthSource,
+          })}
+        </Badge>
+        {lane.widthHint ? (
+          <span className="text-sm text-muted-foreground">{lane.widthHint}</span>
+        ) : null}
       </div>
 
       {lane.jobs.length === 0 ? (

@@ -27,8 +27,10 @@ async function parseReason(request: Request): Promise<string | undefined> {
   }
 
   const form = await request.formData();
-  const reason = String(form.get("reason") ?? "").trim();
-  return reason || undefined;
+  const customReason = String(form.get("reason") ?? "").trim();
+  const presetReason = String(form.get("reasonPreset") ?? "").trim();
+  const combined = customReason || presetReason;
+  return combined || undefined;
 }
 
 export async function POST(

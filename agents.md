@@ -59,6 +59,9 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 - Proposal form includes **adresas** (object address), persisted on `proposals.address`
 - `/eile`, `/cechas`, `/admin/konvejeriai` load data server-side (no client fetch/HMR dependency behind Cloudflare tunnel)
 - Gamybos eilė: `scheduleQueue` priskiria KONV/KNEW pagal plytos plotį (skirtingi plotiai viename užsakyme → skirtingi konvejeriai); eilėje rodoma 240/720 pal./d., reguliavimas 30 min., rotacija 4 val.
+- Admin ir `/eile` naudoja tą patį efektyvų konvejerio plotį (`getEffectiveMachineWidth`: DB → aktyvus darbas → eilėje).
+- Pjūviai (baras): native `<select>` su „Nežinau“; `Pridėti eilutę` kuria antrą nepriklausomą plytelių eilutę.
+- Cechas „Baigti darbą“: native `<select name="reasonPreset">` + papildomas tekstas; privaloma, jei neužbaigtas planas.
 - Login `/prisijungti` uses native form POST (303 relative redirect; works without JS/HMR)
 - `/cechas` write actions (paletė, baigti, keisti įrenginį) use native `<form method="post">` + 303 redirect
 - Patvirtinti → one gamybos darbas per plytelių eilutė (E2: 2 tipai → 2 darbai)

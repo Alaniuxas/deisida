@@ -20,6 +20,14 @@ import {
 } from "@/lib/queue/format";
 import type { ShopJob } from "@/lib/production-types";
 
+const FINISH_REASON_PRESETS = [
+  "Trūko medžiagos",
+  "Sugadinta paletė / brokas",
+  "Įranga sustojo",
+  "Klaidingas užsakymas",
+  "Kita",
+] as const;
+
 function quantityLabel(unit: ShopJob["quantityUnit"], count: number): string {
   if (unit === "pallets") {
     return count === 1 ? "1 paletė" : `${count} paletės`;
@@ -218,32 +226,48 @@ export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
       <Card className="rounded-2xl border-stone-line">
         <CardContent className="space-y-4 pt-5">
           <p className="text-base font-medium">Baigti darbą</p>
-          {underPlan ? (
-            <p className="text-sm text-muted-foreground">
-              Jei neužbaigėte viso plano, įrašykite priežastį. Mažiau nei 90 %
-              — signalas siunčiamas vadovui.
-            </p>
-          ) : null}
+          <p className="text-sm text-muted-foreground">
+            {underPlan
+              ? "Neužbaigus viso plano, pasirinkite arba įrašykite priežastį. Mažiau nei 90 % — signalas siunčiamas vadovui."
+              : "Jei baigiate anksčiau nei planas, galite nurodyti priežastį (neprivaloma)."}
+          </p>
           <form
             method="post"
             action={`/api/jobs/${job.id}/finish`}
             className="space-y-4"
           >
-            {underPlan ? (
-              <div className="space-y-2">
-                <Label htmlFor="finish-reason" className="text-base">
-                  Priežastis (privaloma, jei liko neužbaigta)
-                </Label>
-                <Textarea
-                  id="finish-reason"
-                  name="reason"
-                  placeholder="Pvz.: trūko medžiagos, sugadinta paletė…"
-                  className="min-h-24 text-base"
-                />
-              </div>
-            ) : (
-              <input type="hidden" name="reason" value="" />
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="finish-reason-preset" className="text-base">
+                Priežastis {underPlan ? "(privaloma)" : "(neprivaloma)"}
+              </Label>
+              <select
+                id="finish-reason-preset"
+                name="reasonPreset"
+                required={underPlan}
+                defaultValue=""
+                className="flex h-12 w-full rounded-xl border border-stone-line bg-paper px-3 text-base"
+              >
+                <option value="" disabled>
+                  Pasirinkite priežastį
+                </option>
+                {FINISH_REASON_PRESETS.map((preset) => (
+                  <option key={preset} value={preset}>
+                    {preset}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="finish-reason" className="text-base">
+                Papildoma informacija
+              </Label>
+              <Textarea
+                id="finish-reason"
+                name="reason"
+                placeholder="Pvz.: trūko 2 palečių, sugadinta pirmoji paletė…"
+                className="min-h-24 text-base"
+              />
+            </div>
             <button
               type="submit"
               disabled={job.quantityLogged === 0}
