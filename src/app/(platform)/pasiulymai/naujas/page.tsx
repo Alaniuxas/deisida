@@ -44,6 +44,9 @@ export default async function NaujasPasiulymasPage({
     address: firstString(params.address) ?? "",
     number: firstString(params.number) ?? "",
     comment: firstString(params.comment) ?? "",
+    pjovimas: firstString(params.pjovimas) ?? "",
+    validUntil: firstString(params.validUntil) ?? "",
+    serviceDeadline: firstString(params.serviceDeadline) ?? "",
   };
   const initialLineCount = Math.max(
     parseRequestedLines(firstString(params.lines)),
@@ -58,6 +61,7 @@ export default async function NaujasPasiulymasPage({
       initialLineCount={initialLineCount}
       seedTileIds={seedTileIds}
       seedFields={seedFields}
+      initialError={firstString(params.error) ?? null}
     />
   );
 }

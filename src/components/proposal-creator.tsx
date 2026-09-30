@@ -237,7 +237,6 @@ function TileLineEditor({
           <TileSearchSelect
             inputId={`tile-${line.id}`}
             fieldName={`lineTile-${index}`}
-            form="add-tile-line-form"
             value={line.tileId}
             catalog={catalog}
             onChange={(tileId) => onChange({ ...line, tileId })}
@@ -255,10 +254,10 @@ function TileLineEditor({
 
         <FormField label="Kiekis" htmlFor={`quantity-${line.id}`}>
           <div className="flex h-10 gap-2">
+              <input type="hidden" name={`lineUnit-${index}`} value={line.quantityUnit} />
             <Input
               id={`quantity-${line.id}`}
               name={`lineQty-${index}`}
-              form="add-tile-line-form"
               type="number"
               min={0}
               step={line.quantityUnit === "pieces" ? 1 : 0.5}
@@ -341,7 +340,20 @@ interface ProposalCreatorProps {
   initialStatus?: string;
   initialLineCount?: number;
   seedTileIds?: string[];
-  seedFields?: Partial<Pick<Proposal, "client" | "object" | "address" | "number" | "comment">>;
+  seedFields?: Partial<
+    Pick<
+      Proposal,
+      | "client"
+      | "object"
+      | "address"
+      | "number"
+      | "comment"
+      | "pjovimas"
+      | "validUntil"
+      | "serviceDeadline"
+    >
+  >;
+  initialError?: string | null;
 }
 
 function applySeedTileIds(proposal: Proposal, seedTileIds: string[]): Proposal {
@@ -368,8 +380,11 @@ function applySeedFields(
     client: seedFields.client ?? proposal.client,
     object: seedFields.object ?? proposal.object,
     address: seedFields.address ?? proposal.address,
-    number: seedFields.number ?? proposal.number,
+    number: seedFields.number || proposal.number,
     comment: seedFields.comment ?? proposal.comment,
+    pjovimas: seedFields.pjovimas || proposal.pjovimas,
+    validUntil: seedFields.validUntil || proposal.validUntil,
+    serviceDeadline: seedFields.serviceDeadline || proposal.serviceDeadline,
   };
 }
 
@@ -486,6 +501,7 @@ export function ProposalCreator({
   initialLineCount = 1,
   seedTileIds = [],
   seedFields,
+  initialError = null,
 }: ProposalCreatorProps) {
   const router = useRouter();
   const [savedId, setSavedId] = useState<string | undefined>(proposalId);
@@ -502,7 +518,7 @@ export function ProposalCreator({
   );
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(initialError);
   const [pdfState, setPdfState] = useState<"idle" | "loading" | "error">("idle");
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [downloadNote, setDownloadNote] = useState<string | null>(null);
@@ -704,6 +720,16 @@ export function ProposalCreator({
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
+      <form
+        id="proposal-form"
+        method="post"
+        action="/api/proposals/submit"
+        className="contents"
+        data-proposal-form
+      >
+        {savedId ? <input type="hidden" name="proposalId" value={savedId} /> : null}
+        <input type="hidden" name="validUntil" value={proposal.validUntil} />
+        <input type="hidden" name="serviceDeadline" value={proposal.serviceDeadline} />
       <header className="border-b border-stone-line bg-white">
         <div className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-end lg:justify-between lg:px-10">
           <div>
@@ -725,32 +751,37 @@ export function ProposalCreator({
             >
               Naujas pasiūlymas
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 border-stone-line bg-paper"
+            <button
+              type="submit"
+              name="intent"
+              value="draft"
+              formAction="/api/proposals/submit"
               disabled={saveState === "saving" || status === "confirmed"}
-              onClick={() => persistProposal("draft")}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-stone-line bg-paper px-4 text-sm font-medium hover:bg-muted/60 disabled:opacity-50"
             >
               {saveState === "saving" ? "Saugoma…" : "Išsaugoti juodraštį"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 border-deisida-muted text-deisida-muted"
+            </button>
+            <button
+              type="submit"
+              name="intent"
+              value="sent"
+              formAction="/api/proposals/submit"
               disabled={saveState === "saving" || status === "confirmed"}
-              onClick={() => persistProposal("sent")}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-deisida-muted px-4 text-sm font-medium text-deisida-muted disabled:opacity-50"
             >
               Pažymėti išsiųstu
-            </Button>
-            <Button
-              type="button"
-              className="h-10 bg-deisida text-deisida-foreground hover:bg-deisida/90"
+            </button>
+            <button
+              type="submit"
+              name="intent"
+              value="confirm"
+              formAction="/api/proposals/submit"
+              data-confirm-proposal
               disabled={saveState === "saving" || status === "confirmed"}
-              onClick={() => persistProposal("confirm")}
+              className="inline-flex h-10 items-center justify-center rounded-md bg-deisida px-4 text-sm font-medium text-deisida-foreground hover:bg-deisida/90 disabled:opacity-50"
             >
               Patvirtinti
-            </Button>
+            </button>
             <DownloadButtons
               onDownload={handleDownloadPdf}
               loading={pdfState === "loading"}
@@ -802,7 +833,6 @@ export function ProposalCreator({
                 <Input
                   id="number"
                   name="number"
-                  form="add-tile-line-form"
                   value={proposal.number}
                   onChange={(event) =>
                     setProposal({ ...proposal, number: event.target.value })
@@ -832,7 +862,6 @@ export function ProposalCreator({
                 <Input
                   id="client"
                   name="client"
-                  form="add-tile-line-form"
                   value={proposal.client}
                   onChange={(event) =>
                     setProposal({ ...proposal, client: event.target.value })
@@ -846,7 +875,6 @@ export function ProposalCreator({
                 <Input
                   id="object"
                   name="object"
-                  form="add-tile-line-form"
                   value={proposal.object}
                   onChange={(event) =>
                     setProposal({ ...proposal, object: event.target.value })
@@ -860,7 +888,6 @@ export function ProposalCreator({
                 <Input
                   id="address"
                   name="address"
-                  form="add-tile-line-form"
                   value={proposal.address}
                   onChange={(event) =>
                     setProposal({ ...proposal, address: event.target.value })
@@ -876,6 +903,7 @@ export function ProposalCreator({
               </Label>
               <Textarea
                 id="comment"
+                name="comment"
                 value={proposal.comment}
                 onChange={(event) =>
                   setProposal({ ...proposal, comment: event.target.value })
@@ -894,31 +922,20 @@ export function ProposalCreator({
           >
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-line px-6 py-6 lg:px-10">
               <h2 className="text-lg font-semibold text-deisida-muted">Plytelės</h2>
-              <form
-                id="add-tile-line-form"
-                method="get"
-                action={addLinePath}
-                data-add-tile-line-form
-                className="inline"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  addTileLine();
-                }}
+              <input
+                type="hidden"
+                name="lines"
+                value={proposal.tileLines.length + 1}
+              />
+              <button
+                type="submit"
+                formMethod="get"
+                formAction={addLinePath}
+                data-add-tile-line
+                className="inline-flex h-10 items-center justify-center rounded-md border border-stone-line bg-paper px-4 text-sm font-medium hover:bg-muted/60"
               >
-                <input
-                  type="hidden"
-                  name="lines"
-                  value={proposal.tileLines.length + 1}
-                />
-                <button
-                  type="submit"
-                  data-add-tile-line
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-stone-line bg-paper px-4 text-sm font-medium hover:bg-muted/60"
-                >
-                  Pridėti eilutę
-                </button>
-              </form>
+                Pridėti eilutę
+              </button>
             </div>
 
             {proposal.tileLines.map((line, index) => (
@@ -1028,6 +1045,7 @@ export function ProposalCreator({
           </div>
         </aside>
       </div>
+      </form>
     </div>
   );
 }

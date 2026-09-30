@@ -13,6 +13,7 @@ import type { QueueLane, QueueResponse } from "@/lib/production-types";
 
 interface EileQueueViewProps {
   data: QueueResponse;
+  notice?: string | null;
 }
 
 function quantityText(
@@ -25,7 +26,7 @@ function quantityText(
   return count === 1 ? "1 vnt." : `${count} vnt.`;
 }
 
-export function EileQueueView({ data }: EileQueueViewProps) {
+export function EileQueueView({ data, notice }: EileQueueViewProps) {
   const totalJobs = data.lanes.reduce((sum, lane) => sum + lane.jobs.length, 0);
 
   return (
@@ -34,6 +35,11 @@ export function EileQueueView({ data }: EileQueueViewProps) {
       subtitle="Planas pagal konvejerį: plotis → terminas. KONV 240 / KNEW 720 paletės per dieną + reguliavimas."
       wide
     >
+      {notice ? (
+        <p className="rounded-xl border border-stone-line bg-[#eef6ee] px-4 py-3 text-sm text-[#2d5a2d]">
+          {notice}
+        </p>
+      ) : null}
       {totalJobs === 0 ? (
         <EmptyState
           title="Eilėje darbų nėra"
