@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { loginAction } from "@/app/prisijungti/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,16 +31,36 @@ export function LoginForm() {
 
     try {
       const formData = new FormData(event.currentTarget);
-      await loginAction(formData);
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.get("email"),
+          password: formData.get("password"),
+          next: formData.get("next") || undefined,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setClientError(data.error ?? "Nepavyko prisijungti.");
+        return;
+      }
+
+      const redirectTo =
+        (formData.get("next") as string | null) ||
+        (data.user?.role === "cechas" ? "/cechas" : "/pasiulymai");
+      window.location.href = redirectTo;
     } catch {
-      setClientError("Nepavyko prisijungti prie serverio.");
+      event.currentTarget.submit();
+    } finally {
       setLoading(false);
     }
   };
 
   return (
     <form
-      action={loginAction}
+      action="/api/auth/login"
       method="post"
       onSubmit={handleSubmit}
       className="mt-8 space-y-5"
