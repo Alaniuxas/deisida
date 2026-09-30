@@ -21,6 +21,7 @@ import {
 import { formatPackagingLines } from "@/lib/packaging-labels";
 import type {
   ConveyorInfo,
+  NextJobResponse,
   ProductionApiError,
   ShopJob,
 } from "@/lib/production-types";
@@ -32,11 +33,17 @@ function quantityLabel(unit: ShopJob["quantityUnit"], count: number): string {
   return count === 1 ? "1 vnt." : `${count} vnt.`;
 }
 
-export function CechasScreen() {
-  const [loading, setLoading] = useState(true);
+interface CechasScreenProps {
+  initialData?: NextJobResponse;
+}
+
+export function CechasScreen({ initialData }: CechasScreenProps) {
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<ProductionApiError | null>(null);
-  const [conveyor, setConveyor] = useState<ConveyorInfo | null>(null);
-  const [job, setJob] = useState<ShopJob | null>(null);
+  const [conveyor, setConveyor] = useState<ConveyorInfo | null>(
+    initialData?.conveyor ?? null,
+  );
+  const [job, setJob] = useState<ShopJob | null>(initialData?.job ?? null);
   const [actionLoading, setActionLoading] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
   const [finishReason, setFinishReason] = useState("");
@@ -60,6 +67,8 @@ export function CechasScreen() {
   }, []);
 
   useEffect(() => {
+    if (initialData) return;
+
     let active = true;
 
     fetchNextJob()
@@ -82,7 +91,7 @@ export function CechasScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialData]);
 
   const handlePallet = async () => {
     if (!job) return;

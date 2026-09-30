@@ -43,6 +43,7 @@ export function createDefaultProposal(tileId?: string): Proposal {
     serviceDeadline: formatIsoDateLocal(inMonth),
     client: "",
     object: "",
+    address: "",
     comment: "",
     pjovimas: PJUVIS_OPTIONS[0],
     packaging: defaultPackaging(),

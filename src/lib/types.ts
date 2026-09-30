@@ -41,6 +41,7 @@ export interface Proposal {
   serviceDeadline: string;
   client: string;
   object: string;
+  address: string;
   comment: string;
   pjovimas: string;
   packaging: PackagingOptions;

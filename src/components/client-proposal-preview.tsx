@@ -78,7 +78,7 @@ export function ClientProposalPreview({
         </dl>
       </header>
 
-      <section className="mb-6 grid gap-3 sm:grid-cols-2">
+      <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-md border border-stone-line px-4 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-deisida-muted">
             Klientas
@@ -90,6 +90,12 @@ export function ClientProposalPreview({
             Objektas
           </p>
           <p className="mt-1 font-medium">{proposal.object || "—"}</p>
+        </div>
+        <div className="rounded-md border border-stone-line px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-deisida-muted">
+            Adresas
+          </p>
+          <p className="mt-1 font-medium">{proposal.address || "—"}</p>
         </div>
       </section>
 

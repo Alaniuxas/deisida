@@ -11,7 +11,11 @@ import {
 } from "@/components/production/async-state";
 import { PageShell } from "@/components/production/page-shell";
 import { fetchQueue } from "@/lib/production-api";
-import type { ProductionApiError, QueueWidthGroup } from "@/lib/production-types";
+import type {
+  ProductionApiError,
+  QueueResponse,
+  QueueWidthGroup,
+} from "@/lib/production-types";
 
 function formatDeadline(deadline: string): string {
   const date = new Date(deadline);
@@ -33,10 +37,16 @@ function quantityText(
   return count === 1 ? "1 vnt." : `${count} vnt.`;
 }
 
-export function EileScreen() {
-  const [loading, setLoading] = useState(true);
+interface EileScreenProps {
+  initialData?: QueueResponse;
+}
+
+export function EileScreen({ initialData }: EileScreenProps) {
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<ProductionApiError | null>(null);
-  const [groups, setGroups] = useState<QueueWidthGroup[]>([]);
+  const [groups, setGroups] = useState<QueueWidthGroup[]>(
+    initialData?.groups ?? [],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,6 +63,8 @@ export function EileScreen() {
   }, []);
 
   useEffect(() => {
+    if (initialData) return;
+
     let active = true;
 
     fetchQueue()
@@ -73,7 +85,7 @@ export function EileScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialData]);
 
   const totalJobs = groups.reduce((sum, group) => sum + group.jobs.length, 0);
 

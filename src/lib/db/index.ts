@@ -84,6 +84,7 @@ export function initializeDatabase(): void {
       client_id TEXT,
       client_name TEXT NOT NULL DEFAULT '',
       object TEXT NOT NULL DEFAULT '',
+      address TEXT NOT NULL DEFAULT '',
       comment TEXT NOT NULL DEFAULT '',
       pjovimas TEXT NOT NULL DEFAULT '',
       packaging_json TEXT NOT NULL DEFAULT '{}',
@@ -138,6 +139,13 @@ export function initializeDatabase(): void {
       PRIMARY KEY (user_id, machine_id)
     );
   `);
+
+  const proposalColumns = sqlite
+    .prepare("PRAGMA table_info(proposals)")
+    .all() as { name: string }[];
+  if (!proposalColumns.some((column) => column.name === "address")) {
+    sqlite.exec(`ALTER TABLE proposals ADD COLUMN address TEXT NOT NULL DEFAULT ''`);
+  }
 }
 
 initializeDatabase();

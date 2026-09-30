@@ -13,7 +13,10 @@ import {
 } from "@/lib/db/schema";
 import { scheduleQueue } from "@/lib/queue/schedule";
 import type { Machine as PlannerMachine, QueueJob as PlannerJob } from "@/lib/queue/types";
-import { DEFAULT_CHANGEOVER_MINUTES } from "@/lib/queue/constants";
+import {
+  DEFAULT_CHANGEOVER_MINUTES,
+  DEFAULT_ROTATION_HOURS,
+} from "@/lib/queue/constants";
 import type {
   QueueResponse,
   QueueWidthGroup,
@@ -113,6 +116,10 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     toPlannerJobs(jobRows),
   );
 
+  const machineCodeById = new Map(
+    machineRows.map((machine) => [machine.id, machine.code as "KONV" | "KNEW"]),
+  );
+
   const assignmentMap = new Map(
     assignments.map((assignment) => [assignment.jobId, assignment]),
   );
@@ -123,6 +130,9 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     const assignment = assignmentMap.get(job.id);
     const widthMm = job.widthMm;
     const group = grouped.get(widthMm) ?? { widthMm, jobs: [] };
+    const conveyorCode = assignment
+      ? machineCodeById.get(assignment.machineId)
+      : undefined;
 
     group.jobs.push({
       id: job.id,
@@ -133,7 +143,7 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
       storisMm: job.tileHeightMm,
       quantityPlanned: job.quantity,
       quantityUnit: job.quantityUnit as "pieces" | "pallets",
-      conveyorCode: assignment?.machineId as "KONV" | "KNEW" | undefined,
+      conveyorCode,
     });
 
     grouped.set(widthMm, group);
@@ -325,7 +335,7 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
     code: machine.code as "KONV" | "KNEW",
     name: machine.title,
     dailyRatePallets: machine.dailyRate,
-    rotationHours: machine.rotationHours ?? 4,
+    rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
     currentWidthMm: machine.currentWidthMm ?? 0,
     assignedPersonIds: assignedByMachine.get(machine.id) ?? [],
   }));

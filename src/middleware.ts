@@ -58,7 +58,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/pasiulymai", request.url));
   }
 
-  if (session.role === "pardavimai" && !pathname.startsWith("/pasiulymai") && !pathname.startsWith("/eile") && !pathname.startsWith("/api/")) {
+  if (
+    session.role === "pardavimai" &&
+    !pathname.startsWith("/pasiulymai") &&
+    !pathname.startsWith("/plyteliu-baras") &&
+    !pathname.startsWith("/eile") &&
+    !pathname.startsWith("/api/")
+  ) {
     return NextResponse.redirect(new URL("/pasiulymai", request.url));
   }
 

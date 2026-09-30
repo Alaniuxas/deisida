@@ -663,6 +663,17 @@ export function ProposalCreator({
                   className={controlClass}
                 />
               </FormField>
+              <FormField label="Adresas" htmlFor="address">
+                <Input
+                  id="address"
+                  value={proposal.address}
+                  onChange={(event) =>
+                    setProposal({ ...proposal, address: event.target.value })
+                  }
+                  placeholder="Objekto adresas"
+                  className={controlClass}
+                />
+              </FormField>
             </div>
             <div className="mt-6">
               <Label htmlFor="comment" className={labelClass}>

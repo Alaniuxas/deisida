@@ -35,6 +35,7 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 |------|------|---------|
 | `/prisijungti` | public | Credential login |
 | `/pasiulymai` | admin, pardavimai | Proposal list |
+| `/plyteliu-baras` | admin, pardavimai | Tile catalog (~296 from Bricks import) |
 | `/pasiulymai/naujas` | admin, pardavimai | Create proposal (catalog from Bricks import) |
 | `/pasiulymai/[id]` | admin, pardavimai | Edit / save / confirm proposal |
 | `/eile` | admin, pardavimai | Production queue (scheduleQueue planner) |
@@ -54,7 +55,10 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 
 - SQLite: `data/deisida.db` (Drizzle schema in `src/lib/db/schema.ts`)
 - Import: `scripts/import-archive.ts` from Bubble archive zip
-- Machines: **KONV** 240/day, **KNEW** 720/day (placeholder rates)
+- Machines: **KONV** 240/day, **KNEW** 720/day; rotacija 4 val. (editable in `/admin/konvejeriai`)
+- Proposal form includes **adresas** (object address), persisted on `proposals.address`
+- `/eile`, `/cechas`, `/admin/konvejeriai` load data server-side (no client fetch/HMR dependency behind Cloudflare tunnel)
+- Login `/prisijungti` uses native form POST + server action (works without JS/HMR)
 - Discs table empty (Alanas adds manually later)
 
 ## Proposal slice (unchanged behaviour)

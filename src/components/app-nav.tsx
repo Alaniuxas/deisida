@@ -15,12 +15,14 @@ interface AppNavProps {
 
 const linksForRole: Record<UserRole, { href: string; label: string }[]> = {
   admin: [
+    { href: "/plyteliu-baras", label: "Plytelių baras" },
     { href: "/pasiulymai", label: "Pasiūlymai" },
     { href: "/eile", label: "Eilė" },
     { href: "/cechas", label: "Cechas" },
     { href: "/admin/konvejeriai", label: "Konvejeriai" },
   ],
   pardavimai: [
+    { href: "/plyteliu-baras", label: "Plytelių baras" },
     { href: "/pasiulymai", label: "Pasiūlymai" },
     { href: "/eile", label: "Eilė" },
   ],
@@ -35,7 +37,7 @@ export function AppNav({ user }: AppNavProps) {
     <header className="border-b border-stone-line bg-white">
       <div className="flex flex-col gap-4 px-6 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-10">
         <div className="flex items-center gap-8">
-          <Link href={links[0]?.href ?? "/"} className="block">
+          <Link href="/plyteliu-baras" className="block">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-deisida">
               Deisida
             </p>

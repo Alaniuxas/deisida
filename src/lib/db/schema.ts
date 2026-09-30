@@ -65,6 +65,7 @@ export const proposals = sqliteTable("proposals", {
   clientId: text("client_id"),
   clientName: text("client_name").notNull().default(""),
   object: text("object").notNull().default(""),
+  address: text("address").notNull().default(""),
   comment: text("comment").notNull().default(""),
   pjovimas: text("pjovimas").notNull().default(""),
   packagingJson: text("packaging_json").notNull().default("{}"),

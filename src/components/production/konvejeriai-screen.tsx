@@ -19,6 +19,7 @@ import {
   saveAssignments,
 } from "@/lib/production-api";
 import type {
+  AssignmentsResponse,
   Machine,
   MachineCode,
   Person,
@@ -27,41 +28,52 @@ import type {
 
 const MACHINE_ORDER: MachineCode[] = ["KONV", "KNEW"];
 
-export function KonvejeriaiScreen() {
-  const [loading, setLoading] = useState(true);
+function buildDraftState(data: AssignmentsResponse) {
+  const sorted = [...data.machines].sort(
+    (a, b) => MACHINE_ORDER.indexOf(a.code) - MACHINE_ORDER.indexOf(b.code),
+  );
+  const assignments: Record<string, string[]> = {};
+  const drafts: Record<
+    string,
+    { dailyRatePallets: string; rotationHours: string; currentWidthMm: string }
+  > = {};
+  for (const machine of sorted) {
+    assignments[machine.id] = [...machine.assignedPersonIds];
+    drafts[machine.id] = {
+      dailyRatePallets: String(machine.dailyRatePallets),
+      rotationHours: String(machine.rotationHours),
+      currentWidthMm: String(machine.currentWidthMm),
+    };
+  }
+  return { sorted, assignments, drafts };
+}
+
+interface KonvejeriaiScreenProps {
+  initialData?: AssignmentsResponse;
+}
+
+export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
+  const initialDrafts = initialData ? buildDraftState(initialData) : null;
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<ProductionApiError | null>(null);
-  const [people, setPeople] = useState<Person[]>([]);
-  const [machines, setMachines] = useState<Machine[]>([]);
+  const [people, setPeople] = useState<Person[]>(initialData?.people ?? []);
+  const [machines, setMachines] = useState<Machine[]>(
+    initialDrafts?.sorted ?? [],
+  );
   const [draftAssignments, setDraftAssignments] = useState<
     Record<string, string[]>
-  >({});
+  >(initialDrafts?.assignments ?? {});
   const [machineDrafts, setMachineDrafts] = useState<
     Record<string, { dailyRatePallets: string; rotationHours: string; currentWidthMm: string }>
-  >({});
+  >(initialDrafts?.drafts ?? {});
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const applyData = useCallback((data: { people: Person[]; machines: Machine[] }) => {
     setPeople(data.people);
-    const sorted = [...data.machines].sort(
-      (a, b) =>
-        MACHINE_ORDER.indexOf(a.code) - MACHINE_ORDER.indexOf(b.code),
-    );
+    const { sorted, assignments, drafts } = buildDraftState(data);
     setMachines(sorted);
-    const assignments: Record<string, string[]> = {};
-    const drafts: Record<
-      string,
-      { dailyRatePallets: string; rotationHours: string; currentWidthMm: string }
-    > = {};
-    for (const machine of sorted) {
-      assignments[machine.id] = [...machine.assignedPersonIds];
-      drafts[machine.id] = {
-        dailyRatePallets: String(machine.dailyRatePallets),
-        rotationHours: String(machine.rotationHours),
-        currentWidthMm: String(machine.currentWidthMm),
-      };
-    }
     setDraftAssignments(assignments);
     setMachineDrafts(drafts);
   }, []);
@@ -83,6 +95,8 @@ export function KonvejeriaiScreen() {
   }, [applyData]);
 
   useEffect(() => {
+    if (initialData) return;
+
     let active = true;
 
     fetchAssignments()
@@ -104,7 +118,7 @@ export function KonvejeriaiScreen() {
     return () => {
       active = false;
     };
-  }, [applyData]);
+  }, [applyData, initialData]);
 
   const unassignedPeople = useMemo(() => {
     const assigned = new Set(
