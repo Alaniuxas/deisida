@@ -3,6 +3,13 @@ import { getAllTiles } from "@/lib/db/tiles";
 
 export const dynamic = "force-dynamic";
 
+function firstString(
+  value: string | string[] | undefined,
+): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
 function parseRequestedLines(value: string | undefined): number {
   const requestedLines = Number(value);
   if (!Number.isFinite(requestedLines)) return 1;
@@ -14,8 +21,7 @@ function parseSeedTileIds(
 ): string[] {
   const ids: string[] = [];
   for (let index = 0; index < 10; index += 1) {
-    const raw = params[`lineTile-${index}`];
-    const value = Array.isArray(raw) ? raw[0] : raw;
+    const value = firstString(params[`lineTile-${index}`]);
     ids[index] = typeof value === "string" ? value : "";
   }
   while (ids.length > 0 && !ids[ids.length - 1]) {
@@ -31,20 +37,27 @@ export default async function NaujasPasiulymasPage({
 }) {
   const catalog = await getAllTiles();
   const params = await searchParams;
-  const linesParam = Array.isArray(params.lines) ? params.lines[0] : params.lines;
   const seedTileIds = parseSeedTileIds(params);
+  const seedFields = {
+    client: firstString(params.client) ?? "",
+    object: firstString(params.object) ?? "",
+    address: firstString(params.address) ?? "",
+    number: firstString(params.number) ?? "",
+    comment: firstString(params.comment) ?? "",
+  };
   const initialLineCount = Math.max(
-    parseRequestedLines(linesParam),
+    parseRequestedLines(firstString(params.lines)),
     seedTileIds.length,
     1,
   );
 
   return (
     <ProposalCreator
-      key={`naujas-${initialLineCount}-${seedTileIds.join(",")}`}
+      key={`naujas-${initialLineCount}-${seedTileIds.join(",")}-${seedFields.client}-${seedFields.object}`}
       catalog={catalog}
       initialLineCount={initialLineCount}
       seedTileIds={seedTileIds}
+      seedFields={seedFields}
     />
   );
 }

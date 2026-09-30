@@ -33,15 +33,21 @@ export function TileSearchSelect({
 
   const filtered = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
-    if (!trimmed) return catalog.slice(0, 120);
-    return catalog
-      .filter(
-        (tile) =>
-          tile.name.toLowerCase().includes(trimmed) ||
-          tile.supplier.toLowerCase().includes(trimmed),
-      )
-      .slice(0, 120);
-  }, [catalog, query]);
+    const matches = trimmed
+      ? catalog.filter(
+          (tile) =>
+            tile.name.toLowerCase().includes(trimmed) ||
+            tile.supplier.toLowerCase().includes(trimmed),
+        )
+      : catalog;
+    const selectedTile = value
+      ? catalog.find((tile) => tile.id === value)
+      : undefined;
+    if (selectedTile && !matches.some((tile) => tile.id === selectedTile.id)) {
+      return [selectedTile, ...matches];
+    }
+    return matches;
+  }, [catalog, query, value]);
 
   return (
     <div className="space-y-2" data-tile-search={inputId}>

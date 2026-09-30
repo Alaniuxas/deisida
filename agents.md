@@ -61,7 +61,7 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 - Gamybos eilė: `scheduleQueue` priskiria KONV/KNEW pagal plytos plotį (skirtingi plotiai viename užsakyme → skirtingi konvejeriai); eilėje rodoma 240/720 pal./d., reguliavimas 30 min., rotacija 4 val.
 - Admin ir `/eile` naudoja tą patį efektyvų konvejerio plotį (`getEffectiveMachineWidth`: DB → aktyvus darbas → eilėje).
 - Pjūviai (baras): native `<select>` su „Nežinau“.
-- `Pridėti eilutę`: visada prideda tuščią eilutę (`addTileLine`); GET `?lines=N` fallback, jei JS nėra. Next soft-nav perskaičiuoja eilutes iš `initialLineCount`. Dual tile → 2 job’ai eilėje.
+- `Pridėti eilutę`: native GET `?lines=N&lineTile-*` (RT4). Patvirtinti prieš POST nuskaito DOM (`#client`, `#object`, `select[name=lineTile-N]`), kad React state sutaptų su ekranu po GET.
 - Cechas „Baigti darbą“: native `<select name="reasonPreset">` + papildomas tekstas; privaloma, jei neužbaigtas planas.
 - Login `/prisijungti` uses native form POST (303 relative redirect; works without JS/HMR)
 - `/cechas` write actions (paletė, baigti, keisti įrenginį) use native `<form method="post">` + 303 redirect

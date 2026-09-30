@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   PackagingOptions,
   Proposal,
@@ -257,6 +257,8 @@ function TileLineEditor({
           <div className="flex h-10 gap-2">
             <Input
               id={`quantity-${line.id}`}
+              name={`lineQty-${index}`}
+              form="add-tile-line-form"
               type="number"
               min={0}
               step={line.quantityUnit === "pieces" ? 1 : 0.5}
@@ -339,6 +341,7 @@ interface ProposalCreatorProps {
   initialStatus?: string;
   initialLineCount?: number;
   seedTileIds?: string[];
+  seedFields?: Partial<Pick<Proposal, "client" | "object" | "address" | "number" | "comment">>;
 }
 
 function applySeedTileIds(proposal: Proposal, seedTileIds: string[]): Proposal {
@@ -355,18 +358,93 @@ function applySeedTileIds(proposal: Proposal, seedTileIds: string[]): Proposal {
   return { ...proposal, tileLines };
 }
 
+function applySeedFields(
+  proposal: Proposal,
+  seedFields: ProposalCreatorProps["seedFields"],
+): Proposal {
+  if (!seedFields) return proposal;
+  return {
+    ...proposal,
+    client: seedFields.client ?? proposal.client,
+    object: seedFields.object ?? proposal.object,
+    address: seedFields.address ?? proposal.address,
+    number: seedFields.number ?? proposal.number,
+    comment: seedFields.comment ?? proposal.comment,
+  };
+}
+
+function readInputValue(id: string): string | null {
+  const element = document.getElementById(id);
+  if (
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement
+  ) {
+    return element.value;
+  }
+  return null;
+}
+
+function readProposalFromDom(current: Proposal): Proposal {
+  if (typeof document === "undefined") return current;
+
+  const tileLines = current.tileLines.map((line, index) => {
+    const select = document.querySelector(
+      `select[name="lineTile-${index}"]`,
+    ) as HTMLSelectElement | null;
+    const quantityInput = document.getElementById(
+      `quantity-${line.id}`,
+    ) as HTMLInputElement | null;
+    const quantity = quantityInput ? Number(quantityInput.value) : line.quantity;
+    return {
+      ...line,
+      tileId: select?.value?.trim() || line.tileId,
+      quantity:
+        Number.isFinite(quantity) && quantity > 0 ? quantity : line.quantity,
+    };
+  });
+
+  for (let index = tileLines.length; index < 10; index += 1) {
+    const select = document.querySelector(
+      `select[name="lineTile-${index}"]`,
+    ) as HTMLSelectElement | null;
+    if (!select) break;
+    tileLines.push(createEmptyTileLine(select.value || undefined));
+  }
+
+  return {
+    ...current,
+    number: readInputValue("number")?.trim() || current.number,
+    client: readInputValue("client")?.trim() || current.client,
+    object: readInputValue("object")?.trim() || current.object,
+    address: readInputValue("address")?.trim() || current.address,
+    comment: readInputValue("comment") ?? current.comment,
+    pjovimas: readInputValue("pjovimas")?.trim() || current.pjovimas,
+    tileLines,
+  };
+}
+
 function buildInitialProposal(
   catalog: Tile[],
   initialProposal?: Proposal,
   initialLineCount = 1,
   editingId?: string,
   seedTileIds: string[] = [],
+  seedFields?: ProposalCreatorProps["seedFields"],
 ): Proposal {
   const base = initialProposal ?? createDefaultProposal(catalog[0]?.id);
-  const seeded = applySeedTileIds(base, seedTileIds);
+  const seeded = applySeedFields(
+    applySeedTileIds(base, seedTileIds),
+    seedFields,
+  );
   const withLines = ensureProposalLineCount(seeded, initialLineCount);
 
-  if (initialProposal || editingId || seedTileIds.some(Boolean)) {
+  if (
+    initialProposal ||
+    editingId ||
+    seedTileIds.some(Boolean) ||
+    Boolean(seedFields?.client || seedFields?.object)
+  ) {
     return withLines;
   }
 
@@ -384,6 +462,7 @@ export function ProposalCreator({
   initialStatus = "draft",
   initialLineCount = 1,
   seedTileIds = [],
+  seedFields,
 }: ProposalCreatorProps) {
   const router = useRouter();
   const [savedId, setSavedId] = useState<string | undefined>(proposalId);
@@ -395,6 +474,7 @@ export function ProposalCreator({
       initialLineCount,
       proposalId,
       seedTileIds,
+      seedFields,
     ),
   );
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -409,6 +489,10 @@ export function ProposalCreator({
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const pendingScrollLineIndex = useRef<number | null>(null);
   const addLinePath = savedId ? `/pasiulymai/${savedId}` : "/pasiulymai/naujas";
+
+  useLayoutEffect(() => {
+    setProposal((current) => readProposalFromDom(current));
+  }, []);
 
   useEffect(() => {
     setRuntimeCatalog(catalog);
@@ -456,7 +540,9 @@ export function ProposalCreator({
   const persistProposal = async (
     nextStatus: "draft" | "sent" | "confirm",
   ): Promise<string | null> => {
-    const errors = validateProposal(proposal);
+    const synced = readProposalFromDom(proposal);
+    setProposal(synced);
+    const errors = validateProposal(synced);
     if (errors.length > 0) {
       setFormError(errors[0]);
       return null;
@@ -473,7 +559,7 @@ export function ProposalCreator({
           method: savedId ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            proposal,
+            proposal: synced,
             status: nextStatus === "confirm" ? "sent" : nextStatus,
             id: savedId,
           }),
@@ -511,7 +597,7 @@ export function ProposalCreator({
           throw new Error(confirmData.error ?? "Nepavyko patvirtinti.");
         }
         setStatus("confirmed");
-        const lineCount = proposal.tileLines.length;
+        const lineCount = synced.tileLines.length;
         const created = confirmData.jobsCreated ?? 0;
         setSaveMessage(
           `Pasiūlymas patvirtintas. Sukurta ${created} gamybos ${created === 1 ? "darbas" : "darbai"} (${lineCount} plytelių ${lineCount === 1 ? "tipas" : "tipai"}).`,
@@ -555,7 +641,9 @@ export function ProposalCreator({
     setDownloadNote(null);
     setDownloadError(null);
 
-    const errors = validateProposal(proposal);
+    const synced = readProposalFromDom(proposal);
+    setProposal(synced);
+    const errors = validateProposal(synced);
     if (errors.length > 0) {
       setFormError(errors[0]);
       setDownloadError(errors[0]);
@@ -569,8 +657,8 @@ export function ProposalCreator({
     try {
       const filename =
         kind === "client"
-          ? await downloadClientProposalPdf(proposal)
-          : await downloadProductionProposalPdf(proposal);
+          ? await downloadClientProposalPdf(synced)
+          : await downloadProductionProposalPdf(synced);
       setDownloadNote(`Atsisiųsta: ${filename}`);
       setPdfState("idle");
     } catch (error) {
@@ -687,6 +775,8 @@ export function ProposalCreator({
               <FormField label="Pasiūlymo numeris" htmlFor="number">
                 <Input
                   id="number"
+                  name="number"
+                  form="add-tile-line-form"
                   value={proposal.number}
                   onChange={(event) =>
                     setProposal({ ...proposal, number: event.target.value })
@@ -715,6 +805,8 @@ export function ProposalCreator({
               <FormField label="Klientas" htmlFor="client">
                 <Input
                   id="client"
+                  name="client"
+                  form="add-tile-line-form"
                   value={proposal.client}
                   onChange={(event) =>
                     setProposal({ ...proposal, client: event.target.value })
@@ -727,6 +819,8 @@ export function ProposalCreator({
               <FormField label="Objektas" htmlFor="object">
                 <Input
                   id="object"
+                  name="object"
+                  form="add-tile-line-form"
                   value={proposal.object}
                   onChange={(event) =>
                     setProposal({ ...proposal, object: event.target.value })
@@ -739,6 +833,8 @@ export function ProposalCreator({
               <FormField label="Adresas" htmlFor="address">
                 <Input
                   id="address"
+                  name="address"
+                  form="add-tile-line-form"
                   value={proposal.address}
                   onChange={(event) =>
                     setProposal({ ...proposal, address: event.target.value })
