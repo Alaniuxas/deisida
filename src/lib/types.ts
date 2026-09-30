@@ -60,6 +60,7 @@ export const PJUVIS_OPTIONS = [
   "Pjovimas L kampu",
   "Atpjovimas nuo L kampo likučio",
   "Horizontalus kampas",
+  "Nežinau",
   "Kita",
 ] as const;
 

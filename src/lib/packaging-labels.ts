@@ -1,32 +1,26 @@
 import type { JobPackaging } from "@/lib/production-types";
 
-const PACKAGING_LABELS: Record<string, string> = {
-  packOnlyIntact: "Pakuoti tik sveikas",
-  packTwoParts: "Pakuoti dviem dalimis",
-  packMoreThanTwoParts: "Pakuoti daugiau nei dviem dalimis",
-  needLeftovers: "Reikia likučių",
-  baseProtection: "Pagrindo apsauga",
-  bottomInterlayer: "Tarpinė apačioje",
-  rowInterlayer: "Tarpinė eilutėse",
-};
+function triStateLabel(value: boolean | null | undefined): string {
+  if (value === true) return "Taip";
+  if (value === false) return "Ne";
+  return "Nenurodyta";
+}
 
 export function formatPackagingLines(packaging: JobPackaging): string[] {
   if (packaging.summary?.length) {
     return packaging.summary;
   }
 
-  const lines: string[] = [];
+  const lines: string[] = [
+    `Pakuoti tik neskilusi: ${triStateLabel(packaging.packOnlyIntact)}`,
+    `Pakuoti į 2 dalis skilusi: ${triStateLabel(packaging.packTwoParts)}`,
+    `Pakuoti daugiau nei į 2 dalis (dūžiai): ${triStateLabel(packaging.packMoreThanTwoParts)}`,
+    `Viduriukai (likučiai): ${triStateLabel(packaging.needLeftovers)}`,
+  ];
 
-  for (const [key, label] of Object.entries(PACKAGING_LABELS)) {
-    const value = packaging[key as keyof JobPackaging];
-    if (value === true) {
-      lines.push(label);
-    }
-  }
-
-  if (lines.length === 0) {
-    return ["Pakavimas nenurodytas"];
-  }
+  if (packaging.baseProtection) lines.push("Bazinė apsauga");
+  if (packaging.bottomInterlayer) lines.push("Apatinis perklojimas");
+  if (packaging.rowInterlayer) lines.push("Kiekvienos eilės perklojimas");
 
   return lines;
 }

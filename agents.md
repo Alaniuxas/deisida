@@ -58,7 +58,9 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 - Machines: **KONV** 240/day, **KNEW** 720/day; rotacija 4 val. (editable in `/admin/konvejeriai`)
 - Proposal form includes **adresas** (object address), persisted on `proposals.address`
 - `/eile`, `/cechas`, `/admin/konvejeriai` load data server-side (no client fetch/HMR dependency behind Cloudflare tunnel)
-- Login `/prisijungti` uses native form POST + server action (works without JS/HMR)
+- Login `/prisijungti` uses native form POST (303 relative redirect; works without JS/HMR)
+- `/cechas` write actions (paletė, baigti, keisti įrenginį) use native `<form method="post">` + 303 redirect
+- Patvirtinti → one gamybos darbas per plytelių eilutė (E2: 2 tipai → 2 darbai)
 - Discs table empty (Alanas adds manually later)
 
 ## Proposal slice (unchanged behaviour)

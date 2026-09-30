@@ -174,8 +174,20 @@ export async function confirmProposal(proposalId: string): Promise<number> {
   const catalogTiles = await db.select().from(tiles);
   const tileMap = new Map(catalogTiles.map((tile) => [tile.id, tileRowToTile(tile)]));
 
+  const existingJobs = await db
+    .select({ proposalLineId: jobs.proposalLineId })
+    .from(jobs)
+    .where(eq(jobs.proposalId, proposalId));
+  const existingLineIds = new Set(
+    existingJobs.map((job) => job.proposalLineId),
+  );
+
   let created = 0;
   for (const [index, line] of proposal.lines.entries()) {
+    if (existingLineIds.has(line.id)) {
+      continue;
+    }
+
     const tile = tileMap.get(line.tileId);
     const tileLine: TileLine = {
       id: line.id,

@@ -148,6 +148,7 @@ export function EileScreen({ initialData }: EileScreenProps) {
                         ) : null}
                       </div>
                       <p className="text-base text-muted-foreground">
+                        {job.proposalNumber ? `${job.proposalNumber} · ` : ""}
                         {job.client}
                         {job.object ? ` · ${job.object}` : ""}
                       </p>

@@ -35,6 +35,7 @@ export interface QueuedJob extends JobRow {
   proposalNumber: string;
   clientName: string;
   object: string;
+  address: string;
   pjovimas: string;
   packaging: PackagingOptions;
   tileHeightMm: number;
@@ -58,6 +59,7 @@ async function loadQueuedJobs(): Promise<QueuedJob[]> {
       proposalNumber: proposals.number,
       clientName: proposals.clientName,
       object: proposals.object,
+      address: proposals.address,
       pjovimas: proposals.pjovimas,
       packagingJson: proposals.packagingJson,
     })
@@ -73,6 +75,7 @@ async function loadQueuedJobs(): Promise<QueuedJob[]> {
     proposalNumber: row.proposalNumber,
     clientName: row.clientName,
     object: row.object,
+    address: row.address,
     pjovimas: row.pjovimas,
     packaging: parsePackaging(row.packagingJson),
     tileHeightMm: row.tileHeightMm,
@@ -137,6 +140,7 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     group.jobs.push({
       id: job.id,
       tileName: job.tileName,
+      proposalNumber: job.proposalNumber,
       client: job.clientName,
       object: job.object,
       deadline: job.deadline,
@@ -183,6 +187,7 @@ function toShopJob(job: QueuedJob, quantityLogged: number): ShopJob {
   return {
     id: job.id,
     tileName: job.tileName,
+    proposalNumber: job.proposalNumber,
     storisMm: job.tileHeightMm,
     quantityPlanned,
     quantityLogged,
@@ -191,6 +196,8 @@ function toShopJob(job: QueuedJob, quantityLogged: number): ShopJob {
     packaging: job.packaging,
     client: job.clientName,
     object: job.object,
+    address: job.address,
+    pjovimas: job.pjovimas,
   };
 }
 
@@ -275,6 +282,11 @@ export async function finishJob(
   const quantityLogged = await countLoggedQuantity(jobId);
   const quantityPlanned =
     job.quantityUnit === "pallets" ? job.quantity : job.pieceCount;
+
+  if (quantityLogged < quantityPlanned && !reason?.trim()) {
+    throw new Error("REASON_REQUIRED");
+  }
+
   const completionPercent =
     quantityPlanned > 0
       ? Math.round((quantityLogged / quantityPlanned) * 100)

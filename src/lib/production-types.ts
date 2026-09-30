@@ -20,6 +20,7 @@ export interface JobPackaging {
 export interface ShopJob {
   id: string;
   tileName: string;
+  proposalNumber?: string;
   storisMm: number;
   quantityPlanned: number;
   quantityLogged: number;
@@ -28,6 +29,8 @@ export interface ShopJob {
   packaging: JobPackaging;
   client?: string;
   object?: string;
+  address?: string;
+  pjovimas?: string;
 }
 
 export interface NextJobResponse {
@@ -48,6 +51,7 @@ export interface FinishJobResponse {
 export interface QueueJob {
   id: string;
   tileName: string;
+  proposalNumber?: string;
   client: string;
   object?: string;
   deadline: string;

@@ -151,7 +151,7 @@ function OrderPackagingEditor({
         />
         <TriStateSelect
           id="order-many-parts"
-          label="Pakuoti daugiau nei į 2 dalis"
+          label="Pakuoti daugiau nei į 2 dalis (dūžiai)"
           value={packaging.packMoreThanTwoParts}
           onChange={(packMoreThanTwoParts) =>
             onChange({ ...packaging, packMoreThanTwoParts })
@@ -159,7 +159,7 @@ function OrderPackagingEditor({
         />
         <TriStateSelect
           id="order-leftovers"
-          label="Ar reikalingi likučiai"
+          label="Viduriukai (likučiai)"
           value={packaging.needLeftovers}
           onChange={(needLeftovers) => onChange({ ...packaging, needLeftovers })}
         />
@@ -438,8 +438,10 @@ export function ProposalCreator({
           throw new Error(confirmData.error ?? "Nepavyko patvirtinti.");
         }
         setStatus("confirmed");
+        const lineCount = proposal.tileLines.length;
+        const created = confirmData.jobsCreated ?? 0;
         setSaveMessage(
-          `Pasiūlymas patvirtintas. Sukurta darbų: ${confirmData.jobsCreated ?? 0}.`,
+          `Pasiūlymas patvirtintas. Sukurta ${created} gamybos ${created === 1 ? "darbas" : "darbai"} (${lineCount} plytelių ${lineCount === 1 ? "tipas" : "tipai"}).`,
         );
       }
 
@@ -720,10 +722,10 @@ export function ProposalCreator({
 
           <section className="border-t border-stone-line bg-white px-6 py-8 lg:px-10">
             <h2 className="mb-6 text-lg font-semibold text-deisida-muted">
-              Baras ir pakavimas
+              Pjūviai ir pakavimas
             </h2>
             <div className="mb-8 max-w-xl">
-              <FormField label="Baras (pjūvis)">
+              <FormField label="Pjūviai (baras)">
                 <Select
                   value={proposal.pjovimas}
                   onValueChange={(pjovimas) => {
@@ -744,9 +746,12 @@ export function ProposalCreator({
                 </Select>
               </FormField>
             </div>
-            <h3 className="mb-6 text-sm font-semibold uppercase tracking-[0.1em] text-deisida-muted">
-              Pakavimas
+            <h3 className="mb-2 text-sm font-semibold uppercase tracking-[0.1em] text-deisida-muted">
+              Skilimų paketavimas
             </h3>
+            <p className="mb-6 text-sm text-muted-foreground">
+              Nurodykite, kaip pakuoti skilusias plyteles ir ar reikalingi viduriukai (likučiai).
+            </p>
             <OrderPackagingEditor
               packaging={proposal.packaging}
               onChange={(packaging) => setProposal({ ...proposal, packaging })}
