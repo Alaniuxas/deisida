@@ -7,6 +7,14 @@ function defaultPathForRole(role: UserRole): string {
   return "/pasiulymai";
 }
 
+/** 303 with a relative Location — safe behind Cloudflare (never 0.0.0.0:43127). */
+function redirectToPath(path: string): NextResponse {
+  return new NextResponse(null, {
+    status: 303,
+    headers: { Location: path },
+  });
+}
+
 async function parseCredentials(request: Request): Promise<{
   email: string;
   password: string;
@@ -40,10 +48,7 @@ export async function POST(request: Request) {
 
     if (!email || !password) {
       if (isFormPost) {
-        return NextResponse.redirect(
-          new URL("/prisijungti?error=empty", request.url),
-          303,
-        );
+        return redirectToPath("/prisijungti?error=empty");
       }
       return jsonError("Įveskite el. paštą ir slaptažodį.");
     }
@@ -51,10 +56,8 @@ export async function POST(request: Request) {
     const user = await loginUser(email, password);
     if (!user) {
       if (isFormPost) {
-        const url = new URL("/prisijungti", request.url);
-        url.searchParams.set("error", "invalid");
-        url.searchParams.set("email", email);
-        return NextResponse.redirect(url, 303);
+        const query = new URLSearchParams({ error: "invalid", email });
+        return redirectToPath(`/prisijungti?${query.toString()}`);
       }
       return jsonError("Neteisingi prisijungimo duomenys.", 401);
     }
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
     if (isFormPost) {
       const destination =
         next && next.startsWith("/") ? next : defaultPathForRole(user.role);
-      return NextResponse.redirect(new URL(destination, request.url), 303);
+      return redirectToPath(destination);
     }
 
     return jsonOk({ user });

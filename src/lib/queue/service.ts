@@ -343,6 +343,25 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
   return { people, machines: adminMachines };
 }
 
+export async function switchWorkerConveyor(
+  userId: string,
+  machineCode: "KONV" | "KNEW",
+): Promise<NextJobResponse> {
+  const data = await getAssignments();
+  const target = data.machines.find((machine) => machine.code === machineCode);
+  if (!target) throw new Error("Konvejeris nerastas.");
+
+  const assignments = data.machines.flatMap((machine) =>
+    machine.assignedPersonIds
+      .filter((personId) => personId !== userId)
+      .map((personId) => ({ personId, machineId: machine.id })),
+  );
+  assignments.push({ personId: userId, machineId: target.id });
+
+  await saveAssignments(assignments);
+  return getNextJobForUser(userId);
+}
+
 export async function saveAssignments(
   assignments: { personId: string; machineId: string }[],
 ): Promise<AssignmentsResponse> {

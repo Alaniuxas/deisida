@@ -69,6 +69,15 @@ export async function fetchNextJob(): Promise<NextJobResponse> {
   return request<NextJobResponse>("/api/jobs/next");
 }
 
+export async function switchConveyor(
+  machineCode: "KONV" | "KNEW",
+): Promise<NextJobResponse> {
+  return request<NextJobResponse>("/api/jobs/conveyor", {
+    method: "POST",
+    body: JSON.stringify({ machineCode }),
+  });
+}
+
 export async function logPallet(jobId: string): Promise<ShopJob> {
   return request<ShopJob>(`/api/jobs/${jobId}/pallet`, { method: "POST" });
 }
