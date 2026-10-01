@@ -1,4 +1,7 @@
-import { CalendarDays, Clock, Cog, Layers, Ruler } from "lucide-react";
+"use client";
+
+import { useMemo, useState } from "react";
+import { CalendarDays, Cog, Layers, Ruler } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/production/async-state";
@@ -13,12 +16,15 @@ import {
   conveyorDisplayLabel,
   formatPalletRateWithNorm,
 } from "@/lib/queue/rate-labels";
+import { cn } from "@/lib/utils";
 import type { QueueLane, QueueResponse } from "@/lib/production-types";
 
 interface EileQueueViewProps {
   data: QueueResponse;
   notice?: string | null;
 }
+
+const LANE_ORDER = ["KONV", "KNEW"];
 
 function quantityText(
   count: number,
@@ -30,27 +36,33 @@ function quantityText(
   return count === 1 ? "1 vnt." : `${count} vnt.`;
 }
 
-function buildRateSubtitle(lanes: QueueLane[]): string {
-  if (lanes.length === 0) {
-    return "Planas pagal konvejerį: artimiausias plotis → terminas.";
+function sortLanes(lanes: QueueLane[]): QueueLane[] {
+  return [...lanes].sort((left, right) => {
+    const leftIndex = LANE_ORDER.indexOf(left.code);
+    const rightIndex = LANE_ORDER.indexOf(right.code);
+    return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);
+  });
+}
+
+function defaultLaneCode(lanes: QueueLane[]): string {
+  const withJobs = lanes.find((lane) => lane.jobs.length > 0);
+  if (withJobs) {
+    return withJobs.code;
   }
-
-  const rates = lanes
-    .map((lane) =>
-      `${lane.code} ${formatPalletRateWithNorm(lane.dailyRatePallets, lane.workNormPiecesPerDay)}`,
-    )
-    .join(" · ");
-
-  return `Planas pagal konvejerį: artimiausias plotis → terminas. Našumas: ${rates} + reguliavimas.`;
+  return lanes.find((lane) => lane.code === "KONV")?.code ?? lanes[0]?.code ?? "KONV";
 }
 
 export function EileQueueView({ data, notice }: EileQueueViewProps) {
-  const totalJobs = data.lanes.reduce((sum, lane) => sum + lane.jobs.length, 0);
+  const lanes = useMemo(() => sortLanes(data.lanes), [data.lanes]);
+  const totalJobs = lanes.reduce((sum, lane) => sum + lane.jobs.length, 0);
+  const [selectedCode, setSelectedCode] = useState(() => defaultLaneCode(lanes));
+  const selectedLane =
+    lanes.find((lane) => lane.code === selectedCode) ?? lanes[0] ?? null;
 
   return (
     <PageShell
       title="Gamybinė eilė"
-      subtitle={buildRateSubtitle(data.lanes)}
+      subtitle="Kitas darbas pagal konvejerį ir plotį."
       wide
     >
       {notice ? (
@@ -64,10 +76,45 @@ export function EileQueueView({ data, notice }: EileQueueViewProps) {
           description="Patvirtinti pasiūlymai dar neperkelti į gamybą."
         />
       ) : (
-        <div className="space-y-10">
-          {data.lanes.map((lane) => (
-            <LaneSection key={lane.code} lane={lane} />
-          ))}
+        <div className="space-y-6">
+          <div className="sticky top-0 z-20 -mx-4 border-b border-stone-line bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Konvejeriai">
+              {lanes.map((lane) => {
+                const active = lane.code === selectedLane?.code;
+                const rate = formatPalletRateWithNorm(
+                  lane.dailyRatePallets,
+                  lane.workNormPiecesPerDay,
+                );
+                const widthText =
+                  lane.currentWidthMm > 0
+                    ? `${lane.currentWidthMm} mm`
+                    : "nereguliuotas";
+
+                return (
+                  <button
+                    key={lane.code}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setSelectedCode(lane.code)}
+                    className={cn(
+                      "min-w-[11rem] flex-1 rounded-2xl border px-4 py-3 text-left transition sm:flex-none",
+                      active
+                        ? "border-deisida bg-deisida text-deisida-foreground shadow-sm"
+                        : "border-stone-line bg-paper text-ink hover:border-deisida/50",
+                    )}
+                  >
+                    <span className="block text-base font-semibold">
+                      {lane.code}
+                      <span className="font-normal opacity-80"> · {widthText}</span>
+                    </span>
+                    <span className="mt-1 block text-sm opacity-90">{rate}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {selectedLane ? <LaneSection lane={selectedLane} /> : null}
         </div>
       )}
     </PageShell>
@@ -87,9 +134,6 @@ function LaneSection({ lane }: { lane: QueueLane }) {
         <h2 className="text-xl font-semibold text-ink">{laneLabel}</h2>
         <Badge className="bg-deisida text-deisida-foreground">
           Našumas (eilėje): {laneRate}
-        </Badge>
-        <Badge variant="secondary">
-          Rotacija {lane.rotationHours} val.
         </Badge>
         <Badge variant="outline">
           Reguliavimas {lane.changeoverMinutes} min.
@@ -207,11 +251,6 @@ function LaneSection({ lane }: { lane: QueueLane }) {
                         label="Pabaiga"
                         value={formatScheduleTimestamp(job.schedule.estimatedEnd)}
                       />
-                      <PlanRow
-                        icon={<Clock className="size-3.5" />}
-                        label="Rotacija"
-                        value={`${job.schedule.rotationHours} val.`}
-                      />
                     </dl>
                   </div>
                 ) : null}
@@ -247,18 +286,13 @@ function Metric({
 function PlanRow({
   label,
   value,
-  icon,
 }: {
   label: string;
   value: string;
-  icon?: React.ReactNode;
 }) {
   return (
     <div>
-      <dt className="flex items-center gap-1 text-muted-foreground">
-        {icon}
-        {label}
-      </dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd className="font-medium text-ink">{value}</dd>
     </div>
   );

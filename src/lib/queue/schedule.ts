@@ -74,21 +74,6 @@ export function sortJobsForMachine(
   );
 }
 
-function groupJobsByProposal(jobs: QueueJob[]): Map<string, QueueJob[]> {
-  const grouped = new Map<string, QueueJob[]>();
-
-  for (const job of jobs) {
-    const proposalJobs = grouped.get(job.proposalId);
-    if (proposalJobs) {
-      proposalJobs.push(job);
-    } else {
-      grouped.set(job.proposalId, [job]);
-    }
-  }
-
-  return grouped;
-}
-
 function groupJobsByWidth(jobs: QueueJob[]): Map<number, QueueJob[]> {
   const grouped = new Map<number, QueueJob[]>();
 
@@ -107,32 +92,18 @@ function groupJobsByWidth(jobs: QueueJob[]): Map<number, QueueJob[]> {
 export function pickMachine(
   machineStates: MachineState[],
   tileWidthMm: number,
-  usedMachineIds: Set<string>,
-  splitAcrossMachines: boolean,
 ): MachineState {
   const widthMatches = machineStates.filter(
     (machine) => machine.currentWidthMm === tileWidthMm,
   );
 
   if (widthMatches.length > 0) {
-    const preferred = splitAcrossMachines
-      ? widthMatches.filter((machine) => !usedMachineIds.has(machine.id))
-      : widthMatches;
-
-    const candidates = preferred.length > 0 ? preferred : widthMatches;
-
-    return candidates.reduce((best, current) =>
+    return widthMatches.reduce((best, current) =>
       current.availableAtHours < best.availableAtHours ? current : best,
     );
   }
 
-  const unused = splitAcrossMachines
-    ? machineStates.filter((machine) => !usedMachineIds.has(machine.id))
-    : machineStates;
-
-  const candidates = unused.length > 0 ? unused : machineStates;
-
-  return candidates.reduce((best, current) => {
+  return machineStates.reduce((best, current) => {
     const bestDelta = Math.abs(best.currentWidthMm - tileWidthMm);
     const currentDelta = Math.abs(current.currentWidthMm - tileWidthMm);
 
@@ -142,6 +113,35 @@ export function pickMachine(
 
     return current.availableAtHours < best.availableAtHours ? current : best;
   });
+}
+
+function earliestDeadline(jobs: QueueJob[]): Date | string {
+  return jobs.reduce(
+    (earliest, job) =>
+      compareDeadlines(job.deadline, earliest) < 0 ? job.deadline : earliest,
+    jobs[0].deadline,
+  );
+}
+
+function appendJobsToMachine(machine: MachineState, jobs: QueueJob[]): void {
+  const sorted = [...jobs].sort((left, right) =>
+    compareDeadlines(left.deadline, right.deadline),
+  );
+  let runningWidthMm =
+    machine.assignedJobs.length > 0
+      ? machine.assignedJobs[machine.assignedJobs.length - 1].tileWidthMm
+      : machine.currentWidthMm;
+
+  for (const job of sorted) {
+    const { durationHours } = computeJobDurationHours(job, {
+      currentWidthMm: runningWidthMm,
+      dailyRatePieces: machine.dailyRatePieces,
+      changeoverMinutes: machine.changeoverMinutes,
+    });
+    machine.assignedJobs.push(job);
+    machine.availableAtHours += durationHours;
+    runningWidthMm = job.tileWidthMm;
+  }
 }
 
 function assignJobsToMachines(
@@ -154,44 +154,30 @@ function assignJobsToMachines(
     assignedJobs: [],
   }));
 
-  const proposals = [...groupJobsByProposal(jobs).entries()].sort(
-    ([, leftJobs], [, rightJobs]) => {
-      const leftDeadline = leftJobs.reduce(
-        (earliest, job) =>
-          compareDeadlines(job.deadline, earliest) < 0 ? job.deadline : earliest,
-        leftJobs[0].deadline,
-      );
-      const rightDeadline = rightJobs.reduce(
-        (earliest, job) =>
-          compareDeadlines(job.deadline, earliest) < 0 ? job.deadline : earliest,
-        rightJobs[0].deadline,
-      );
+  const remainingWidthGroups: [number, QueueJob[]][] = [];
 
-      return compareDeadlines(leftDeadline, rightDeadline);
-    },
+  for (const [width, widthJobs] of groupJobsByWidth(jobs)) {
+    const exactMatches = machineStates.filter(
+      (machine) => machine.currentWidthMm === width,
+    );
+
+    if (exactMatches.length > 0) {
+      const machine = exactMatches.reduce((best, current) =>
+        current.availableAtHours < best.availableAtHours ? current : best,
+      );
+      appendJobsToMachine(machine, widthJobs);
+      continue;
+    }
+
+    remainingWidthGroups.push([width, widthJobs]);
+  }
+
+  remainingWidthGroups.sort(([, leftJobs], [, rightJobs]) =>
+    compareDeadlines(earliestDeadline(leftJobs), earliestDeadline(rightJobs)),
   );
 
-  for (const [, proposalJobs] of proposals) {
-    const widthGroups = [...groupJobsByWidth(proposalJobs).entries()].sort(
-      ([leftWidth], [rightWidth]) => leftWidth - rightWidth,
-    );
-    const splitAcrossMachines = widthGroups.length > 1;
-    const usedMachineIds = new Set<string>();
-
-    for (const [, widthJobs] of widthGroups) {
-      const sortedWidthJobs = [...widthJobs].sort((left, right) =>
-        compareDeadlines(left.deadline, right.deadline),
-      );
-      const machine = pickMachine(
-        machineStates,
-        sortedWidthJobs[0].tileWidthMm,
-        usedMachineIds,
-        splitAcrossMachines,
-      );
-
-      machine.assignedJobs.push(...sortedWidthJobs);
-      usedMachineIds.add(machine.id);
-    }
+  for (const [width, widthJobs] of remainingWidthGroups) {
+    appendJobsToMachine(pickMachine(machineStates, width), widthJobs);
   }
 
   return machineStates;

@@ -33,8 +33,11 @@ async function readPdfText(filePath: string): Promise<string> {
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ acceptDownloads: true });
-  const page = await context.newPage({ viewport: { width: 1600, height: 1000 } });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    viewport: { width: 1600, height: 1000 },
+  });
+  const page = await context.newPage();
 
   await waitForApp(page);
   await page.locator("#client").fill("UAB Statybos partneriai");

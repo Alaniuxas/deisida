@@ -63,7 +63,7 @@ export default async function CechasPage({
       title="Cechas"
       subtitle={
         conveyor
-          ? `Jūsų konvejeris: ${conveyorDisplayLabel(conveyor.code, conveyor.name)} · Našumas (eilėje): ${formatPalletRateWithNorm(conveyor.dailyRatePallets ?? 0, conveyor.workNormPiecesPerDay)} · rotacija ${conveyor.rotationHours ?? "—"} val.`
+          ? `Jūsų konvejeris: ${conveyorDisplayLabel(conveyor.code, conveyor.name)} · Našumas (eilėje): ${formatPalletRateWithNorm(conveyor.dailyRatePallets ?? 0, conveyor.workNormPiecesPerDay)}`
           : "Kitas darbas jūsų konvejeryje"
       }
     >

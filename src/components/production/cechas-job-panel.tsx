@@ -6,7 +6,6 @@ import {
   Scissors,
   CalendarDays,
   Cog,
-  Clock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -183,11 +182,6 @@ export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
                   label="Planuojama pabaiga"
                   value={formatScheduleTimestamp(schedule.estimatedEnd)}
                 />
-                <PlanItem
-                  icon={<Clock className="size-3.5" />}
-                  label="Rotacija"
-                  value={`${schedule.rotationHours} val.`}
-                />
               </dl>
             </div>
           ) : null}
@@ -289,18 +283,13 @@ export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
 function PlanItem({
   label,
   value,
-  icon,
 }: {
   label: string;
   value: string;
-  icon?: React.ReactNode;
 }) {
   return (
     <div>
-      <dt className="flex items-center gap-1 text-muted-foreground">
-        {icon}
-        {label}
-      </dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd className="text-base font-medium text-ink">{value}</dd>
     </div>
   );

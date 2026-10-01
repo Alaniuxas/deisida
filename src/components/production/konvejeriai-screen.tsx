@@ -352,10 +352,10 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
     setSaveError(null);
     setSaveMessage(null);
     try {
-      const assignments = Object.entries(draftAssignments).flatMap(
-        ([machineId, personIds]) =>
+      const assignments: { personId: string; machineId: string | null }[] =
+        Object.entries(draftAssignments).flatMap(([machineId, personIds]) =>
           personIds.map((personId) => ({ personId, machineId })),
-      );
+        );
 
       for (const person of people) {
         const assigned = assignments.some((item) => item.personId === person.id);

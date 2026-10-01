@@ -76,8 +76,8 @@ export function LithuanianDatePicker({
           locale={lt}
           weekStartsOn={1}
           captionLayout="dropdown"
-          fromYear={currentYear - 1}
-          toYear={currentYear + 5}
+          startMonth={new Date(currentYear - 1, 0)}
+          endMonth={new Date(currentYear + 5, 11)}
           defaultMonth={selected}
           className="p-3"
         />

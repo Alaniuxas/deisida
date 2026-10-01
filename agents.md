@@ -64,8 +64,9 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 - Cechas naudoja aktyvų rotacijos priskyrimą šiandienai; fallback — `machine_assignments`
 - Proposal form includes **adresas** (object address), persisted on `proposals.address`
 - `/eile`, `/cechas`, `/admin/konvejeriai` load data server-side (no client fetch/HMR dependency behind Cloudflare tunnel)
-- Gamybos eilė: `scheduleQueue` priskiria KONV/KNEW pagal plytos plotį (skirtingi plotiai viename užsakyme → skirtingi konvejeriai); konvejeryje darbai rikiuojami: pirmiausia jau esantis plotis, tada **mažiausias plotio koregavimas** (nearest-neighbor), terminas — tarp lygių; `pickMachine` be tikslaus pločio renka mažiausią \|dabartinis − darbo plotis\|, tada ankstyviausią laisvumą
-- UI rodo KONV/KNEW; prie pal./d. visada rodoma ir darbo norma vnt./d.; reguliavimas 30 min., rotacija 4 val.
+- Gamybos eilė: `scheduleQueue` / `pickMachine` naudoja **DB** `machines.current_width_mm` (ne plotį iš eilės). Pirmiausia visi darbai, kurių plotis = konvejerio W, eina į tą konvejerį (globaliai, ne pagal užsakymą). Likę — į konvejerį su mažiausiu `|currentWidth − jobWidth|`, lygios → ankstesnis laisvumas. `splitAcrossMachines` nebėra: tas pats užsakymas gali likti viename konvejeryje, jei arčiau. Konvejeryje: `orderJobsByWidthCorrection` (nearest-neighbor nuo dabartinio pločio).
+- `/eile`: viršuje lipnūs KONV/KNEW tabai (pavadinimas + mm + pal./d. · vnt./d.); matomas tik pasirinktas konvejeris. Numatytasis — pirmas konvejeris su darbais, kitaip KONV. Antraštė trumpa: „Kitas darbas pagal konvejerį ir plotį.“
+- UI rodo KONV/KNEW ir pal./d. · vnt./d. ant tabor ir gamybos plane; reguliavimas 30 min. **Rotacija 4 val.** nerodoma `/eile` ir `/cechas` (admin laukas lieka).
 - Admin ir `/eile` naudoja tą patį efektyvų konvejerio plotį (`getEffectiveMachineWidth`: DB → aktyvus darbas → eilėje).
 - Pjūviai (baras): native `<select>` su „Nežinau“.
 - `Pridėti eilutę`: GET `formMethod` ant to paties formos (RT4). **Patvirtinti** / juodraštis — native `POST /api/proposals/submit` (303 `/eile`), veikia be JS.

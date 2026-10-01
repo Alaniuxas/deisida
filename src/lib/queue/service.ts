@@ -158,32 +158,25 @@ function machineShopCode(machine: typeof machines.$inferSelect): string {
 function buildAssignmentReason(
   job: QueuedJob,
   machine: (typeof machines.$inferSelect),
-  machineCurrentWidthMm: number,
+  storedWidthMm: number,
   requiresChangeover: boolean,
-  splitProposalWidths: Set<string>,
 ): string {
-  const proposalKey = job.proposalId;
   const conveyorLabel = machine.code;
-  const widthMatches =
-    machineCurrentWidthMm > 0 && job.widthMm === machineCurrentWidthMm;
-
-  if (splitProposalWidths.has(proposalKey)) {
-    return `Užsakyme keli plytų plotiai — priskirta ${conveyorLabel}, kad nereikėtų reguliuoti konvejerio.`;
-  }
+  const widthMatches = storedWidthMm > 0 && job.widthMm === storedWidthMm;
 
   if (widthMatches) {
-    return `Konvejeris ${conveyorLabel} jau sureguliuotas ${job.widthMm} mm pločiui — artimiausias plotis, tada terminas.`;
+    return `Konvejeris ${conveyorLabel} jau sureguliuotas ${job.widthMm} mm pločiui — visi šio pločio darbai čia.`;
   }
 
-  if (requiresChangeover && machineCurrentWidthMm > 0) {
-    return `Po šio darbo reikės reguliuoti konvejerį iš ${machineCurrentWidthMm} mm į ${job.widthMm} mm (+${DEFAULT_CHANGEOVER_MINUTES} min.).`;
-  }
-
-  if (machineCurrentWidthMm === 0) {
+  if (storedWidthMm === 0) {
     return `Konvejeris ${conveyorLabel} dar nereguliuotas — darbas planuojamas pagal ${job.widthMm} mm plotį ir terminą.`;
   }
 
-  return `Priskirta ${conveyorLabel} pagal eilės tvarką (mažiausias plotio koregavimas, tada terminas).`;
+  if (requiresChangeover) {
+    return `Priskirta ${conveyorLabel}: artimiausias dabartiniam pločiui (${storedWidthMm} mm → ${job.widthMm} mm). Po šio darbo reikės reguliuoti (+${DEFAULT_CHANGEOVER_MINUTES} min.).`;
+  }
+
+  return `Priskirta ${conveyorLabel} pagal mažiausią |dabartinis plotis − darbo plotis| (${storedWidthMm} mm → ${job.widthMm} mm), tada ankstesnį laisvumą.`;
 }
 
 async function buildSchedule(): Promise<BuiltSchedule | null> {
@@ -274,25 +267,6 @@ function toApiQueueJob(
   };
 }
 
-function detectSplitProposalWidths(jobRows: QueuedJob[]): Set<string> {
-  const widthsByProposal = new Map<string, Set<number>>();
-
-  for (const job of jobRows) {
-    const widths = widthsByProposal.get(job.proposalId) ?? new Set<number>();
-    widths.add(job.widthMm);
-    widthsByProposal.set(job.proposalId, widths);
-  }
-
-  const split = new Set<string>();
-  for (const [proposalId, widths] of widthsByProposal) {
-    if (widths.size > 1) {
-      split.add(proposalId);
-    }
-  }
-
-  return split;
-}
-
 function sortJobsForLane(
   laneJobs: { job: QueuedJob; assignment: ReturnType<typeof scheduleQueue>[number] }[],
   machineCurrentWidthMm: number,
@@ -326,7 +300,6 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     workNormRows.map((norm) => [norm.machineCode as MachineCode, norm.minPiecesPerDay]),
   );
 
-  const splitProposalWidths = detectSplitProposalWidths(built.jobRows);
   const lanes: QueueLane[] = [];
   const grouped = new Map<number, QueueWidthGroup>();
 
@@ -353,7 +326,7 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
       machineJobs.map((item) => item.job),
     );
     const machineCurrentWidthMm = effectiveWidth.widthMm;
-    const ordered = sortJobsForLane(machineJobs, machineCurrentWidthMm);
+    const ordered = sortJobsForLane(machineJobs, machine.currentWidthMm ?? 0);
     const machineCode = machine.code as MachineCode;
     const workNormPiecesPerDay = workNormByCode.get(machineCode);
 
@@ -362,9 +335,8 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
       const assignmentReason = buildAssignmentReason(
         job,
         machine,
-        machineCurrentWidthMm,
+        machine.currentWidthMm ?? 0,
         requiresChangeover,
-        splitProposalWidths,
       );
       const schedule = toJobScheduleInfo(
         job,
