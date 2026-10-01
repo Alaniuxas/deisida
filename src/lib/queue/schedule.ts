@@ -5,6 +5,7 @@ import {
   KONV_MACHINE_DEFAULTS,
   createDefaultMachines,
 } from "./constants";
+import { orderJobsByWidthCorrection } from "./width-order";
 import type {
   Assignment,
   Machine,
@@ -65,22 +66,12 @@ export function sortJobsForMachine(
   jobs: QueueJob[],
   machineCurrentWidthMm: number,
 ): QueueJob[] {
-  return [...jobs].sort((left, right) => {
-    const leftWidthMatch =
-      left.tileWidthMm === machineCurrentWidthMm ? 0 : 1;
-    const rightWidthMatch =
-      right.tileWidthMm === machineCurrentWidthMm ? 0 : 1;
-
-    if (leftWidthMatch !== rightWidthMatch) {
-      return leftWidthMatch - rightWidthMatch;
-    }
-
-    if (left.tileWidthMm !== right.tileWidthMm) {
-      return left.tileWidthMm - right.tileWidthMm;
-    }
-
-    return compareDeadlines(left.deadline, right.deadline);
-  });
+  return orderJobsByWidthCorrection(
+    jobs,
+    machineCurrentWidthMm,
+    (job) => job.tileWidthMm,
+    (job) => job.deadline,
+  );
 }
 
 function groupJobsByProposal(jobs: QueueJob[]): Map<string, QueueJob[]> {
@@ -113,7 +104,7 @@ function groupJobsByWidth(jobs: QueueJob[]): Map<number, QueueJob[]> {
   return grouped;
 }
 
-function pickMachine(
+export function pickMachine(
   machineStates: MachineState[],
   tileWidthMm: number,
   usedMachineIds: Set<string>,
@@ -141,9 +132,16 @@ function pickMachine(
 
   const candidates = unused.length > 0 ? unused : machineStates;
 
-  return candidates.reduce((best, current) =>
-    current.availableAtHours < best.availableAtHours ? current : best,
-  );
+  return candidates.reduce((best, current) => {
+    const bestDelta = Math.abs(best.currentWidthMm - tileWidthMm);
+    const currentDelta = Math.abs(current.currentWidthMm - tileWidthMm);
+
+    if (currentDelta !== bestDelta) {
+      return currentDelta < bestDelta ? current : best;
+    }
+
+    return current.availableAtHours < best.availableAtHours ? current : best;
+  });
 }
 
 function assignJobsToMachines(

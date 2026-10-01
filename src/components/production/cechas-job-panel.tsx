@@ -74,7 +74,7 @@ export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
             {schedule ? (
               <>
                 <Badge className="bg-deisida text-deisida-foreground">
-                  {schedule.conveyorCode}
+                  {schedule.conveyorShopCode}
                 </Badge>
                 <Badge variant="outline">#{schedule.positionInQueue} eilėje</Badge>
               </>
@@ -148,11 +148,11 @@ export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
             <div className="rounded-xl border border-stone-line bg-muted/30 px-4 py-4">
               <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Cog className="size-4" />
-                Gamybos planas ({schedule.conveyorCode})
+                Gamybos planas ({schedule.conveyorShopCode})
               </div>
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <PlanItem
-                  label="Našumas"
+                  label="Našumas (eilėje)"
                   value={`${schedule.dailyRatePallets} pal./d.`}
                 />
                 <PlanItem

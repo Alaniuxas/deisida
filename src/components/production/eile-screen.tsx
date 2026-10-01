@@ -141,9 +141,9 @@ export function EileScreen({ initialData }: EileScreenProps) {
                         <CardTitle className="text-lg font-semibold leading-snug">
                           {job.tileName}
                         </CardTitle>
-                        {job.conveyorCode ? (
+                        {job.conveyorShopCode || job.conveyorCode ? (
                           <Badge className="bg-deisida text-deisida-foreground">
-                            {job.conveyorCode}
+                            {job.conveyorShopCode ?? job.conveyorCode}
                           </Badge>
                         ) : null}
                       </div>

@@ -15,7 +15,9 @@ import {
   getRotationsAdminData,
   getActiveRotationMachineId,
 } from "@/lib/queue/rotations";
+import { resolveShopCode } from "@/lib/queue/shop-code";
 import { scheduleQueue } from "@/lib/queue/schedule";
+import { orderJobsByWidthCorrection } from "@/lib/queue/width-order";
 import type { Machine as PlannerMachine, QueueJob as PlannerJob } from "@/lib/queue/types";
 import {
   DEFAULT_CHANGEOVER_MINUTES,
@@ -148,6 +150,10 @@ function machineJobsForMachine(
   });
 }
 
+function machineShopCode(machine: typeof machines.$inferSelect): string {
+  return resolveShopCode(machine.code, machine.shopCode);
+}
+
 function buildAssignmentReason(
   job: QueuedJob,
   machine: (typeof machines.$inferSelect),
@@ -156,15 +162,16 @@ function buildAssignmentReason(
   splitProposalWidths: Set<string>,
 ): string {
   const proposalKey = job.proposalId;
+  const shopCode = machineShopCode(machine);
   const widthMatches =
     machineCurrentWidthMm > 0 && job.widthMm === machineCurrentWidthMm;
 
   if (splitProposalWidths.has(proposalKey)) {
-    return `Užsakyme keli plytų plotiai — priskirta ${machine.code}, kad nereikėtų reguliuoti konvejerio.`;
+    return `Užsakyme keli plytų plotiai — priskirta ${shopCode}, kad nereikėtų reguliuoti konvejerio.`;
   }
 
   if (widthMatches) {
-    return `Konvejeris ${machine.code} jau sureguliuotas ${job.widthMm} mm pločiui — prioritetas pagal plotį, tada terminą.`;
+    return `Konvejeris ${shopCode} jau sureguliuotas ${job.widthMm} mm pločiui — artimiausias plotis, tada terminas.`;
   }
 
   if (requiresChangeover && machineCurrentWidthMm > 0) {
@@ -172,10 +179,10 @@ function buildAssignmentReason(
   }
 
   if (machineCurrentWidthMm === 0) {
-    return `Konvejeris ${machine.code} dar nereguliuotas — darbas planuojamas pagal ${job.widthMm} mm plotį ir terminą.`;
+    return `Konvejeris ${shopCode} dar nereguliuotas — darbas planuojamas pagal ${job.widthMm} mm plotį ir terminą.`;
   }
 
-  return `Priskirta ${machine.code} pagal eilės tvarką (plotis ${job.widthMm} mm, terminas).`;
+  return `Priskirta ${shopCode} pagal eilės tvarką (mažiausias plotio koregavimas, tada terminas).`;
 }
 
 async function buildSchedule(): Promise<BuiltSchedule | null> {
@@ -225,6 +232,7 @@ function toJobScheduleInfo(
     widthMm: job.widthMm,
     deadline: job.deadline,
     conveyorCode: machine.code as MachineCode,
+    conveyorShopCode: machineShopCode(machine),
     conveyorName: machine.title,
     machineCurrentWidthMm: machine.currentWidthMm ?? 0,
     dailyRatePallets: machine.dailyRate,
@@ -258,6 +266,7 @@ function toApiQueueJob(
     quantityPlanned: job.quantity,
     quantityUnit: job.quantityUnit as "pieces" | "pallets",
     conveyorCode: schedule?.conveyorCode,
+    conveyorShopCode: schedule?.conveyorShopCode,
     schedule,
   };
 }
@@ -285,34 +294,21 @@ function sortJobsForLane(
   laneJobs: { job: QueuedJob; assignment: ReturnType<typeof scheduleQueue>[number] }[],
   machineCurrentWidthMm: number,
 ): { job: QueuedJob; assignment: ReturnType<typeof scheduleQueue>[number] }[] {
-  return [...laneJobs].sort((left, right) => {
-    const leftInProgress = left.job.status === "in_progress" ? 0 : 1;
-    const rightInProgress = right.job.status === "in_progress" ? 0 : 1;
-    if (leftInProgress !== rightInProgress) {
-      return leftInProgress - rightInProgress;
-    }
+  const inProgress = laneJobs.filter((item) => item.job.status === "in_progress");
+  const rest = laneJobs.filter((item) => item.job.status !== "in_progress");
+  const startWidthMm =
+    inProgress.length > 0
+      ? inProgress[inProgress.length - 1].job.widthMm
+      : machineCurrentWidthMm;
 
-    const leftWidthMatch =
-      left.job.widthMm === machineCurrentWidthMm && machineCurrentWidthMm > 0
-        ? 0
-        : 1;
-    const rightWidthMatch =
-      right.job.widthMm === machineCurrentWidthMm && machineCurrentWidthMm > 0
-        ? 0
-        : 1;
-    if (leftWidthMatch !== rightWidthMatch) {
-      return leftWidthMatch - rightWidthMatch;
-    }
+  const orderedRest = orderJobsByWidthCorrection(
+    rest,
+    startWidthMm,
+    (item) => item.job.widthMm,
+    (item) => item.job.deadline,
+  );
 
-    if (left.job.widthMm !== right.job.widthMm) {
-      return left.job.widthMm - right.job.widthMm;
-    }
-
-    return (
-      new Date(left.job.deadline).getTime() -
-      new Date(right.job.deadline).getTime()
-    );
-  });
+  return [...inProgress, ...orderedRest];
 }
 
 export async function getScheduledQueue(): Promise<QueueResponse> {
@@ -377,6 +373,7 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
 
     lanes.push({
       code: machine.code as MachineCode,
+      shopCode: machineShopCode(machine),
       name: machine.title,
       currentWidthMm: machineCurrentWidthMm,
       widthSource: effectiveWidth.source,
@@ -474,6 +471,7 @@ export async function getNextJobForUser(userId: string): Promise<NextJobResponse
   const conveyor: ConveyorInfo = {
     id: machine.id,
     code: machine.code as MachineCode,
+    shopCode: machineShopCode(machine),
     name: machine.title,
     currentWidthMm: lane?.currentWidthMm ?? machine.currentWidthMm ?? 0,
     dailyRatePallets: machine.dailyRate,
@@ -629,6 +627,7 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
     return {
       id: machine.id,
       code: machine.code as MachineCode,
+      shopCode: machineShopCode(machine),
       name: machine.title,
       dailyRatePallets: machine.dailyRate,
       rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
@@ -683,6 +682,7 @@ export async function patchMachineSettings(
     dailyRatePallets?: number;
     rotationHours?: number;
     currentWidthMm?: number;
+    shopCode?: string;
   },
 ): Promise<AssignmentsResponse> {
   const [machine] = await db
@@ -708,6 +708,10 @@ export async function patchMachineSettings(
         patch.currentWidthMm !== undefined
           ? patch.currentWidthMm
           : machine.currentWidthMm,
+      shopCode:
+        patch.shopCode !== undefined
+          ? patch.shopCode.trim() || null
+          : machine.shopCode,
     })
     .where(eq(machines.id, machineId));
 

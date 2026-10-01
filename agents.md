@@ -40,7 +40,7 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 | `/plyteliu-baras` | admin, pardavimai | Tile catalog (~296 from Bricks import) |
 | `/pasiulymai/naujas` | admin, pardavimai | Create proposal (catalog from Bricks import) |
 | `/pasiulymai/[id]` | admin, pardavimai | Edit / save / confirm proposal |
-| `/eile` | admin, pardavimai, cechas | Production queue by KONV/KNEW lane (width → deadline) |
+| `/eile` | admin, pardavimai, cechas | Production queue by conveyor lane (shop code sk1/sk2; logic KONV/KNEW) |
 | `/cechas` | admin, cechas | Next job, pallet log, finish |
 | `/admin/konvejeriai` | admin | Rotacijos periodai, priskyrimai, darbo normos, KONV/KNEW nustatymai |
 
@@ -52,18 +52,20 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 - `POST /api/jobs/:id/finish` — complete job; &lt;90 % → alert
 - `GET/POST /api/admin/assignments` — people ↔ machine (fallback be aktyvaus periodo)
 - `GET/POST/PATCH /api/admin/rotations` — rotacijos periodai, perkėlimas su priežastimi
-- `PATCH /api/admin/machines/:id` — `dailyRate`, `rotationHours`, `currentWidthMm`
+- `PATCH /api/admin/machines/:id` — `dailyRate`, `rotationHours`, `currentWidthMm`, `shopCode`
 
 ## Data
 
 - SQLite: `data/deisida.db` (Drizzle schema in `src/lib/db/schema.ts`)
 - Import: `scripts/import-archive.ts` from Bubble archive zip
-- Machines: **KONV** 240 pal./d., **KNEW** 720 pal./d. (eilės planas); darbo normos CSV: **2700 / 1700 vnt./d.**
+- Machines: internal **KONV** / **KNEW**; floor labels **sk1** / **sk2** (`machines.shop_code`, editable in `/admin/konvejeriai`)
+- Eilės našumas: **sk1** 240 pal./d., **sk2** 720 pal./d. (queue capacity, not bricks); darbo normos CSV: **2700 / 1700 vnt./d.**
 - Konvejerio rotacijos: periodai (`rotation_periods`), priskyrimai, istorija su priežastimi; demo: `npm run db:seed-rotation`
 - Cechas naudoja aktyvų rotacijos priskyrimą šiandienai; fallback — `machine_assignments`
 - Proposal form includes **adresas** (object address), persisted on `proposals.address`
 - `/eile`, `/cechas`, `/admin/konvejeriai` load data server-side (no client fetch/HMR dependency behind Cloudflare tunnel)
-- Gamybos eilė: `scheduleQueue` priskiria KONV/KNEW pagal plytos plotį (skirtingi plotiai viename užsakyme → skirtingi konvejeriai); eilėje rodoma 240/720 pal./d., reguliavimas 30 min., rotacija 4 val.
+- Gamybos eilė: `scheduleQueue` priskiria KONV/KNEW pagal plytos plotį (skirtingi plotiai viename užsakyme → skirtingi konvejeriai); konvejeryje darbai rikiuojami: pirmiausia jau esantis plotis, tada **mažiausias plotio koregavimas** (nearest-neighbor), terminas — tarp lygių; `pickMachine` be tikslaus pločio renka mažiausią \|dabartinis − darbo plotis\|, tada ankstyviausią laisvumą
+- UI rodo cecho kodą (sk1/sk2), ne KONV/KNEW; eilėje 240/720 **pal./d.**, reguliavimas 30 min., rotacija 4 val.
 - Admin ir `/eile` naudoja tą patį efektyvų konvejerio plotį (`getEffectiveMachineWidth`: DB → aktyvus darbas → eilėje).
 - Pjūviai (baras): native `<select>` su „Nežinau“.
 - `Pridėti eilutę`: GET `formMethod` ant to paties formos (RT4). **Patvirtinti** / juodraštis — native `POST /api/proposals/submit` (303 `/eile`), veikia be JS.

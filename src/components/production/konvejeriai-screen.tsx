@@ -52,11 +52,17 @@ function buildDraftState(data: AssignmentsResponse) {
   const assignments: Record<string, string[]> = {};
   const drafts: Record<
     string,
-    { dailyRatePallets: string; rotationHours: string; currentWidthMm: string }
+    {
+      shopCode: string;
+      dailyRatePallets: string;
+      rotationHours: string;
+      currentWidthMm: string;
+    }
   > = {};
   for (const machine of sorted) {
     assignments[machine.id] = [...machine.assignedPersonIds];
     drafts[machine.id] = {
+      shopCode: machine.shopCode,
       dailyRatePallets: String(machine.dailyRatePallets),
       rotationHours: String(machine.rotationHours),
       currentWidthMm: String(machine.currentWidthMm),
@@ -111,7 +117,15 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
     Record<string, string[]>
   >(initialDrafts?.assignments ?? {});
   const [machineDrafts, setMachineDrafts] = useState<
-    Record<string, { dailyRatePallets: string; rotationHours: string; currentWidthMm: string }>
+    Record<
+      string,
+      {
+        shopCode: string;
+        dailyRatePallets: string;
+        rotationHours: string;
+        currentWidthMm: string;
+      }
+    >
   >(initialDrafts?.drafts ?? {});
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -270,7 +284,7 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
 
   const updateMachineDraft = (
     machineId: string,
-    field: "dailyRatePallets" | "rotationHours" | "currentWidthMm",
+    field: "shopCode" | "dailyRatePallets" | "rotationHours" | "currentWidthMm",
     value: string,
   ) => {
     setMachineDrafts((prev) => ({
@@ -302,12 +316,14 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
         if (!draft) continue;
 
         const patch = {
+          shopCode: draft.shopCode.trim(),
           dailyRatePallets: Number(draft.dailyRatePallets),
           rotationHours: Number(draft.rotationHours),
           currentWidthMm: Number(draft.currentWidthMm),
         };
 
         if (
+          patch.shopCode !== machine.shopCode ||
           patch.dailyRatePallets !== machine.dailyRatePallets ||
           patch.rotationHours !== machine.rotationHours ||
           patch.currentWidthMm !== machine.storedWidthMm
@@ -374,6 +390,7 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
       : MACHINE_ORDER.map((code) => ({
           id: `placeholder-${code}`,
           code,
+          shopCode: code === "KONV" ? "sk1" : "sk2",
           name: code === "KONV" ? "Konvejeris" : "Naujas konvejeris",
           dailyRatePallets: 0,
           rotationHours: 8,
@@ -513,8 +530,8 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
             <TabsContent value="konvejeriai" className="space-y-6">
               <p className="text-sm text-muted-foreground">
                 Eilės planavimui naudojamos <strong>paletės per dieną</strong>{" "}
-                (KONV 240 / KNEW 720). Darbo normos (vnt./d.) rodomos viršuje —
-                atskira CSV metrika.
+                (sk1 240 / sk2 720 pal./d.). Darbo normos (vnt./d., pvz. 2700 /
+                1700) rodomos viršuje — atskira CSV metrika, ne eilės našumas.
               </p>
               <MachineSettingsGrid
                 displayMachines={displayMachines}
@@ -610,8 +627,9 @@ function WorkNormsBanner({
             >
               <div className="mb-2 flex items-center gap-2">
                 <Badge className="bg-deisida text-deisida-foreground">
-                  {code}
+                  {machine?.shopCode ?? (code === "KONV" ? "sk1" : "sk2")}
                 </Badge>
+                <span className="text-xs text-muted-foreground">({code})</span>
               </div>
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">
@@ -667,7 +685,7 @@ function AssignmentGrid({
             <CardHeader className="border-b border-stone-line pb-4">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <span className="rounded-lg bg-deisida px-2.5 py-1 text-sm font-bold text-deisida-foreground">
-                  {machine.code}
+                  {machine.shopCode}
                 </span>
                 {machine.name}
               </CardTitle>
@@ -698,7 +716,7 @@ function AssignmentGrid({
                   </div>
                 ) : (
                   <p className="mb-4 rounded-xl border border-dashed border-stone-line px-4 py-3 text-base text-muted-foreground">
-                    Dar niekas nepriskirtas {machine.code}.
+                    Dar niekas nepriskirtas {machine.shopCode}.
                   </p>
                 )}
 
@@ -728,7 +746,10 @@ function AssignmentGrid({
                           {person.name}
                           {otherCode ? (
                             <span className="ml-2 text-sm text-muted-foreground">
-                              (dabar {otherCode})
+                              (dabar{" "}
+                              {displayMachines.find((item) => item.code === otherCode)
+                                ?.shopCode ?? otherCode}
+                              )
                             </span>
                           ) : (
                             <span className="ml-2 text-sm text-muted-foreground">
@@ -758,11 +779,16 @@ function MachineSettingsGrid({
   displayMachines: Machine[];
   machineDrafts: Record<
     string,
-    { dailyRatePallets: string; rotationHours: string; currentWidthMm: string }
+    {
+      shopCode: string;
+      dailyRatePallets: string;
+      rotationHours: string;
+      currentWidthMm: string;
+    }
   >;
   updateMachineDraft: (
     machineId: string,
-    field: "dailyRatePallets" | "rotationHours" | "currentWidthMm",
+    field: "shopCode" | "dailyRatePallets" | "rotationHours" | "currentWidthMm",
     value: string,
   ) => void;
   showEmptyMachines: boolean;
@@ -771,6 +797,7 @@ function MachineSettingsGrid({
     <div className="grid gap-6 lg:grid-cols-2">
       {displayMachines.map((machine) => {
         const draft = machineDrafts[machine.id] ?? {
+          shopCode: machine.shopCode,
           dailyRatePallets: String(machine.dailyRatePallets),
           rotationHours: String(machine.rotationHours),
           currentWidthMm: String(machine.currentWidthMm),
@@ -782,9 +809,23 @@ function MachineSettingsGrid({
             className="paper-shadow rounded-2xl border-stone-line"
           >
             <CardHeader className="border-b border-stone-line pb-4">
-              <CardTitle className="text-xl">{machine.code}</CardTitle>
+              <CardTitle className="text-xl">
+                {machine.shopCode}{" "}
+                <span className="text-sm font-normal text-muted-foreground">
+                  ({machine.code})
+                </span>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 pt-5 sm:grid-cols-3">
+            <CardContent className="grid gap-4 pt-5 sm:grid-cols-2 lg:grid-cols-4">
+              <ShopCodeField
+                id={`shop-${machine.id}`}
+                label="Cecho kodas (rodomas eilėje)"
+                value={draft.shopCode}
+                onChange={(value) =>
+                  updateMachineDraft(machine.id, "shopCode", value)
+                }
+                disabled={showEmptyMachines}
+              />
               <Field
                 id={`rate-${machine.id}`}
                 label="Paletės per dieną (eilė)"
@@ -858,6 +899,36 @@ function HistoryList({ history }: { history: RotationHistoryEntry[] }) {
           </p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function ShopCodeField({
+  id,
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-sm text-muted-foreground">
+        {label}
+      </Label>
+      <Input
+        id={id}
+        type="text"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-12 text-base"
+      />
     </div>
   );
 }

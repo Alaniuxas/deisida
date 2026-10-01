@@ -45,6 +45,7 @@ export default async function CechasPage({
   const machines = assignments.machines.map((machine) => ({
     id: machine.id,
     code: machine.code,
+    shopCode: machine.shopCode,
     name: machine.name,
   }));
 
@@ -58,7 +59,7 @@ export default async function CechasPage({
       title="Cechas"
       subtitle={
         conveyor
-          ? `Jūsų konvejeris: ${conveyor.name} (${conveyor.code}) · ${conveyor.dailyRatePallets ?? "—"} pal./d. · rotacija ${conveyor.rotationHours ?? "—"} val.`
+          ? `Jūsų konvejeris: ${conveyor.shopCode} — ${conveyor.name} · Našumas (eilėje): ${conveyor.dailyRatePallets ?? "—"} pal./d. · rotacija ${conveyor.rotationHours ?? "—"} val.`
           : "Kitas darbas jūsų konvejeryje"
       }
     >
@@ -66,6 +67,7 @@ export default async function CechasPage({
         <div className="mb-5">
           <ConveyorSwitchForm
             currentCode={conveyor.code}
+            currentShopCode={conveyor.shopCode}
             currentName={conveyor.name}
             machines={machines}
             switchedCode={params.switched}

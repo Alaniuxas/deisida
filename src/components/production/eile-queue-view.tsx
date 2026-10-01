@@ -32,7 +32,7 @@ export function EileQueueView({ data, notice }: EileQueueViewProps) {
   return (
     <PageShell
       title="Gamybinė eilė"
-      subtitle="Planas pagal konvejerį: plotis → terminas. KONV 240 / KNEW 720 paletės per dieną + reguliavimas."
+      subtitle="Planas pagal konvejerį: artimiausias plotis → terminas. Našumas eilėje: sk1 240 / sk2 720 pal./d. (ne vnt./d.) + reguliavimas."
       wide
     >
       {notice ? (
@@ -61,10 +61,10 @@ function LaneSection({ lane }: { lane: QueueLane }) {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-xl font-semibold text-ink">
-          {lane.code} — {lane.name}
+          {lane.shopCode} — {lane.name}
         </h2>
         <Badge className="bg-deisida text-deisida-foreground">
-          {lane.dailyRatePallets} pal./d.
+          Našumas (eilėje): {lane.dailyRatePallets} pal./d.
         </Badge>
         <Badge variant="secondary">
           Rotacija {lane.rotationHours} val.
@@ -98,14 +98,14 @@ function LaneSection({ lane }: { lane: QueueLane }) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-muted-foreground">
-                      #{job.schedule?.positionInQueue ?? "—"} eilėje · {lane.code}
+                      #{job.schedule?.positionInQueue ?? "—"} eilėje · {lane.shopCode}
                     </p>
                     <CardTitle className="text-lg font-semibold leading-snug">
                       {job.tileName}
                     </CardTitle>
                   </div>
                   <Badge className="bg-deisida text-deisida-foreground">
-                    {lane.code}
+                    {lane.shopCode}
                   </Badge>
                 </div>
                 <p className="text-base text-muted-foreground">
@@ -147,11 +147,11 @@ function LaneSection({ lane }: { lane: QueueLane }) {
                   <div className="rounded-xl border border-stone-line bg-muted/30 p-4">
                     <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                       <Cog className="size-4" />
-                      Gamybos planas ({lane.code})
+                      Gamybos planas ({lane.shopCode})
                     </div>
                     <dl className="grid gap-2 text-sm sm:grid-cols-2">
                       <PlanRow
-                        label="Našumas"
+                        label="Našumas (eilėje)"
                         value={`${job.schedule.dailyRatePallets} pal./d.`}
                       />
                       <PlanRow

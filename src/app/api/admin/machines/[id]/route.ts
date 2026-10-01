@@ -24,6 +24,8 @@ export async function PATCH(
         body.currentWidthMm !== undefined
           ? Number(body.currentWidthMm)
           : undefined,
+      shopCode:
+        body.shopCode !== undefined ? String(body.shopCode) : undefined,
     });
 
     return jsonOk(data);

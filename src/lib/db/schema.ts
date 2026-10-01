@@ -40,6 +40,7 @@ export const clients = sqliteTable("clients", {
 export const machines = sqliteTable("machines", {
   id: text("id").primaryKey(),
   code: text("code").notNull().unique(),
+  shopCode: text("shop_code"),
   title: text("title").notNull(),
   dailyRate: integer("daily_rate").notNull().default(0),
   rotationHours: real("rotation_hours"),

@@ -65,6 +65,7 @@ export function initializeDatabase(): void {
     CREATE TABLE IF NOT EXISTS machines (
       id TEXT PRIMARY KEY,
       code TEXT NOT NULL UNIQUE,
+      shop_code TEXT,
       title TEXT NOT NULL,
       daily_rate INTEGER NOT NULL DEFAULT 0,
       rotation_hours REAL,
@@ -181,6 +182,18 @@ export function initializeDatabase(): void {
   if (!proposalColumns.some((column) => column.name === "address")) {
     sqlite.exec(`ALTER TABLE proposals ADD COLUMN address TEXT NOT NULL DEFAULT ''`);
   }
+
+  const machineColumns = sqlite
+    .prepare("PRAGMA table_info(machines)")
+    .all() as { name: string }[];
+  if (!machineColumns.some((column) => column.name === "shop_code")) {
+    sqlite.exec(`ALTER TABLE machines ADD COLUMN shop_code TEXT`);
+  }
+
+  sqlite.exec(`
+    UPDATE machines SET shop_code = 'sk1' WHERE code = 'KONV' AND (shop_code IS NULL OR shop_code = '');
+    UPDATE machines SET shop_code = 'sk2' WHERE code = 'KNEW' AND (shop_code IS NULL OR shop_code = '');
+  `);
 }
 
 initializeDatabase();

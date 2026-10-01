@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "db:import": "tsx scripts/import-archive.ts",
     "db:norms": "tsx scripts/import-work-norms.ts",
     "db:seed-rotation": "tsx scripts/seed-rotation-demo.ts"
@@ -45,6 +46,7 @@
     "playwright": "^1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

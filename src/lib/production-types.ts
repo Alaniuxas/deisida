@@ -5,6 +5,7 @@ export type MachineWidthSource = "stored" | "in_progress" | "queued" | "unset";
 export interface ConveyorInfo {
   id: string;
   code: MachineCode;
+  shopCode: string;
   name: string;
   currentWidthMm?: number;
   dailyRatePallets?: number;
@@ -27,6 +28,7 @@ export interface JobScheduleInfo {
   widthMm: number;
   deadline: string;
   conveyorCode: MachineCode;
+  conveyorShopCode: string;
   conveyorName: string;
   machineCurrentWidthMm: number;
   dailyRatePallets: number;
@@ -87,6 +89,7 @@ export interface QueueJob {
   quantityPlanned: number;
   quantityUnit: "pallets" | "pieces";
   conveyorCode?: MachineCode;
+  conveyorShopCode?: string;
   schedule?: JobScheduleInfo;
 }
 
@@ -97,6 +100,7 @@ export interface QueueWidthGroup {
 
 export interface QueueLane {
   code: MachineCode;
+  shopCode: string;
   name: string;
   currentWidthMm: number;
   widthSource: MachineWidthSource;
@@ -120,6 +124,7 @@ export interface Person {
 export interface Machine {
   id: string;
   code: MachineCode;
+  shopCode: string;
   name: string;
   dailyRatePallets: number;
   rotationHours: number;
@@ -197,6 +202,7 @@ export interface MachinePatchRequest {
   dailyRatePallets?: number;
   rotationHours?: number;
   currentWidthMm?: number;
+  shopCode?: string;
 }
 
 export type ApiErrorKind = "not_found" | "network" | "server" | "unknown";

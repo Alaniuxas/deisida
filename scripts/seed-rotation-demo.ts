@@ -33,8 +33,20 @@ async function seedUsers(passwordHash: string): Promise<void> {
 
 async function seedMachines(): Promise<void> {
   const rows = [
-    { id: "KONV", code: "KONV", title: "Senas konvejeris", dailyRate: 240 },
-    { id: "KNEW", code: "KNEW", title: "Naujas konvejeris", dailyRate: 720 },
+    {
+      id: "KONV",
+      code: "KONV",
+      shopCode: "sk1",
+      title: "Senas konvejeris",
+      dailyRate: 240,
+    },
+    {
+      id: "KNEW",
+      code: "KNEW",
+      shopCode: "sk2",
+      title: "Naujas konvejeris",
+      dailyRate: 720,
+    },
   ] as const;
 
   for (const machine of rows) {
@@ -43,6 +55,7 @@ async function seedMachines(): Promise<void> {
       .values({
         id: machine.id,
         code: machine.code,
+        shopCode: machine.shopCode,
         title: machine.title,
         dailyRate: machine.dailyRate,
         rotationHours: 4,
@@ -51,6 +64,7 @@ async function seedMachines(): Promise<void> {
       .onConflictDoUpdate({
         target: machines.id,
         set: {
+          shopCode: machine.shopCode,
           title: machine.title,
           dailyRate: machine.dailyRate,
           rotationHours: 4,
