@@ -134,22 +134,7 @@ export function EileQueueView({
         </p>
       )}
 
-      {data.aiSource === "mock" ? (
-        <div className="rounded-xl border border-stone-line bg-paper px-4 py-3 text-sm">
-          <p className="font-medium text-ink">
-            AI patarimai dar neįjungti. Norėdami įjungti — žr. instrukciją žemiau
-            arba kreipkitės į administratorių.
-          </p>
-          {isAdmin ? <AiAuditAdminHelp /> : null}
-          {data.aiComments.length > 0 ? (
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-muted-foreground">
-              {data.aiComments.map((comment) => (
-                <li key={comment}>{comment}</li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : data.aiComments.length > 0 ? (
+      {data.aiSource === "claude" && data.aiComments.length > 0 ? (
         <div className="rounded-xl border border-stone-line bg-paper px-4 py-3 text-sm">
           <p className="mb-2 font-medium text-ink">AI pastabos (Claude)</p>
           <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
@@ -158,6 +143,8 @@ export function EileQueueView({
             ))}
           </ul>
         </div>
+      ) : (data.aiSource === "mock" || data.aiSource === null) && isAdmin ? (
+        <AiAuditAdminHelp />
       ) : null}
 
       {totalJobs === 0 ? (
