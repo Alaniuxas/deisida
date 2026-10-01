@@ -42,8 +42,13 @@ export interface Assignment {
   priority: ClusterPriority;
 }
 
+import type { LockedWeek } from "./week";
+
 export interface ScheduleOptions {
   referenceTime?: Date;
+  lockedWeek?: LockedWeek;
+  /** Spread locked-week work across Mon–Fri and balance machine load (default true when lockedWeek set). */
+  balanceLockedWeek?: boolean;
 }
 
 export interface MachineDefaults {

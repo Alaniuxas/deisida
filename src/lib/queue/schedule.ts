@@ -7,6 +7,15 @@ import {
   SHIFT_HOURS,
   createDefaultMachines,
 } from "./constants";
+import {
+  assignJobsWithLoadBalance,
+  createDayCursors,
+  rebalanceEmptyMachines,
+  recordSpreadHours,
+  scheduleBalancedJob,
+  spreadCursorForJob,
+  type BalancedMachineState,
+} from "./balance";
 import { addWorkDuration } from "./work-hours";
 import { orderJobsByP1P2P3 } from "./width-order";
 import type {
@@ -297,15 +306,27 @@ export function scheduleQueue(
   options: ScheduleOptions = {},
 ): Assignment[] {
   const referenceTime = options.referenceTime ?? new Date();
+  const balanceLockedWeek =
+    options.balanceLockedWeek ?? Boolean(options.lockedWeek);
   const machineStates: MachineState[] = machines.map((machine) => toMachineState(machine));
   const widthAssignment = assignWidthsToMachines(machineStates, jobs);
   const picks = new Map<string, { criterion: PickCriterion; otherId: string | null }>();
 
+  assignJobsWithLoadBalance(
+    machineStates as BalancedMachineState[],
+    jobs,
+    widthAssignment,
+  );
+  if (balanceLockedWeek) {
+    rebalanceEmptyMachines(machineStates as BalancedMachineState[]);
+  }
+
   for (const job of jobs) {
     const pick = widthAssignment.get(job.tileWidthMm);
     const machine =
-      machineStates.find((state) => state.id === pick?.machineId) ?? machineStates[0];
-    machine.assignedJobs.push(job);
+      machineStates.find((state) => state.assignedJobs.some((assigned) => assigned.id === job.id)) ??
+      machineStates.find((state) => state.id === pick?.machineId) ??
+      machineStates[0];
     const other =
       machineStates.find((state) => state.id !== machine.id) ?? null;
     picks.set(job.id, {
@@ -315,8 +336,13 @@ export function scheduleQueue(
   }
 
   const assignments: Assignment[] = [];
+  const globalDayLoads = [0, 0, 0, 0, 0];
+  const dayCursors =
+    options.lockedWeek && balanceLockedWeek
+      ? createDayCursors(options.lockedWeek)
+      : null;
 
-  for (const machine of machineStates) {
+  machineStates.forEach((machine, machineIndex) => {
     const orderedJobs = sortJobsForMachine(
       machine.assignedJobs,
       machine.currentWidthMm,
@@ -326,17 +352,37 @@ export function scheduleQueue(
     let cursor = referenceTime;
     let previous: QueueJob | null = null;
 
-    for (const job of orderedJobs) {
+    orderedJobs.forEach((job, jobIndex) => {
       const { durationHours, changeoverHours } = computeJobDurationHours(
         job,
         machine,
         runningWidthMm,
       );
       const pick = picks.get(job.id);
-      const { start: estimatedStart, end: estimatedEnd } = addWorkDuration(
-        cursor,
-        durationHours,
-      );
+
+      if (dayCursors && options.lockedWeek) {
+        cursor = spreadCursorForJob(
+          options.lockedWeek,
+          dayCursors,
+          globalDayLoads,
+          machineIndex,
+          jobIndex,
+        );
+      }
+
+      const { start: estimatedStart, end: estimatedEnd } = dayCursors
+        ? scheduleBalancedJob(cursor, durationHours)
+        : addWorkDuration(cursor, durationHours);
+
+      if (dayCursors && options.lockedWeek) {
+        recordSpreadHours(
+          globalDayLoads,
+          dayCursors,
+          options.lockedWeek,
+          estimatedStart,
+          estimatedEnd,
+        );
+      }
 
       assignments.push({
         jobId: job.id,
@@ -361,8 +407,8 @@ export function scheduleQueue(
       cursor = estimatedEnd;
       runningWidthMm = job.tileWidthMm;
       previous = job;
-    }
-  }
+    });
+  });
 
   return assignments.sort(
     (left, right) => left.estimatedStart.getTime() - right.estimatedStart.getTime(),

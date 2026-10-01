@@ -98,7 +98,7 @@ export function zonedTimeToUtc(
   return date;
 }
 
-function addCalendarDays(iso: string, days: number): string {
+export function addCalendarDays(iso: string, days: number): string {
   const [year, month, day] = iso.split("-").map(Number);
   const utc = new Date(Date.UTC(year, month - 1, day + days));
   return formatIsoDate(utc.getUTCFullYear(), utc.getUTCMonth() + 1, utc.getUTCDate());

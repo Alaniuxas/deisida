@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { isTimestampInLockedWeek } from "./week";
 import { pickMachine, scheduleQueue, sortJobsForMachine } from "./schedule";
 import type { Machine, QueueJob } from "./types";
+
+const LOCKED_WEEK = { startIso: "2026-10-05", endIso: "2026-10-11" };
 
 function makeJob(
   id: string,
@@ -209,5 +212,66 @@ describe("scheduleQueue P1/P2 clustering", () => {
       "near",
       "far",
     ]);
+  });
+});
+
+describe("scheduleQueue load balancing", () => {
+  const sixMachines: Machine[] = [
+    plannerMachine("NK1", 100, 720),
+    plannerMachine("NK2", 0, 720),
+    plannerMachine("S1", 0, 240),
+    plannerMachine("S2", 0, 240),
+    plannerMachine("S4", 0, 240),
+    plannerMachine("SK1", 14, 240),
+  ];
+
+  it("spreads jobs across machines in the locked week instead of leaving lanes empty", () => {
+    const jobs = [
+      makeJob("a", 100, "2026-10-08"),
+      makeJob("b", 101, "2026-10-09"),
+      makeJob("c", 102, "2026-10-10"),
+      makeJob("d", 90, "2026-10-11"),
+      makeJob("e", 50, "2026-10-12"),
+      makeJob("f", 10, "2026-10-13"),
+    ];
+
+    const assignments = scheduleQueue(sixMachines, jobs, {
+      referenceTime: new Date("2026-10-05T05:00:00.000Z"),
+      lockedWeek: LOCKED_WEEK,
+      balanceLockedWeek: true,
+    });
+
+    const locked = assignments.filter((assignment) =>
+      isTimestampInLockedWeek(assignment.estimatedStart, LOCKED_WEEK),
+    );
+    const machinesUsed = new Set(locked.map((assignment) => assignment.machineId));
+
+    expect(locked.length).toBeGreaterThanOrEqual(4);
+    expect(machinesUsed.size).toBeGreaterThanOrEqual(4);
+  });
+
+  it("does not schedule far-future P3 first on NK1 when balancing locked week", () => {
+    const assignments = scheduleQueue(
+      [plannerMachine("NK1", 100, 720)],
+      [
+        makeJob("december", 108, "2026-12-31"),
+        makeJob("urgent", 90, "2026-10-08"),
+      ],
+      {
+        referenceTime: new Date("2026-10-05T05:00:00.000Z"),
+        lockedWeek: LOCKED_WEEK,
+        balanceLockedWeek: true,
+      },
+    );
+
+    const nk1 = assignments
+      .filter((assignment) => assignment.machineId === "NK1")
+      .sort(
+        (left, right) =>
+          left.estimatedStart.getTime() - right.estimatedStart.getTime(),
+      );
+
+    expect(nk1.map((assignment) => assignment.jobId)).toEqual(["urgent", "december"]);
+    expect(nk1[0]?.jobId).not.toBe("december");
   });
 });

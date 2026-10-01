@@ -65,7 +65,8 @@ export async function auditQueuePlan(input: AuditInput): Promise<AuditResult> {
     };
   }
 
-  const prompt = `Tu esi Deisida gamybos eilės auditorius. NEGALIMA perrūšiuoti darbų ar keisti mm priskyrimo.
+  const prompt = `Tu esi Deisida gamybos eilės auditorius. Variklis jau balansuoja darbus per stakles ir dienas (P1/P2/P3 + apkrovos balansas).
+Jei vis tiek matai akivaizdžių spragų užrakintoje savaitėje, pasiūlyk konkretų darbo perkėlimą tarp staklių (tik locked week).
 Grąžink 3–6 trumpas lietuviškas pastabas (kiekviena eilutė atskira), pvz. tuščios staklės, netolygus krūvis, override istorijos pamokos.
 Užrakinta savaitė: ${input.lockedWeek.startIso} – ${input.lockedWeek.endIso}
 Staklės: ${input.machineCodes.join(", ")}

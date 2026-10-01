@@ -8,6 +8,7 @@ import {
   queuePlanRuns,
   tiles,
 } from "@/lib/db/schema";
+import { plannerReferenceTime } from "./balance";
 import { scheduleQueue } from "./schedule";
 import { ensureCuttingNorms, ensureShopMachines } from "./excel-norms";
 import { auditQueuePlan } from "./ai-audit";
@@ -109,7 +110,9 @@ export async function runFridayQueuePlan(now = new Date()): Promise<PlanRunResul
   const { plannerMachines, plannerJobs, machineRows } = await loadPlannerInput();
   const lockedWeek = lockedWeekForPlanner(now);
   const assignments = scheduleQueue(plannerMachines, plannerJobs, {
-    referenceTime: now,
+    referenceTime: plannerReferenceTime(now, lockedWeek),
+    lockedWeek,
+    balanceLockedWeek: true,
   });
 
   const runId = crypto.randomUUID();
