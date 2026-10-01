@@ -1,6 +1,4 @@
-"use client";
-
-import { useMemo, useState } from "react";
+import Link from "next/link";
 import { CalendarDays, Cog, Layers, Ruler } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +20,9 @@ import type { QueueLane, QueueResponse } from "@/lib/production-types";
 interface EileQueueViewProps {
   data: QueueResponse;
   notice?: string | null;
+  selectedCode?: string;
+  confirmed?: string;
+  jobsCreated?: string;
 }
 
 const LANE_ORDER = ["KONV", "KNEW"];
@@ -52,12 +53,32 @@ function defaultLaneCode(lanes: QueueLane[]): string {
   return lanes.find((lane) => lane.code === "KONV")?.code ?? lanes[0]?.code ?? "KONV";
 }
 
-export function EileQueueView({ data, notice }: EileQueueViewProps) {
-  const lanes = useMemo(() => sortLanes(data.lanes), [data.lanes]);
+function laneHref(
+  code: string,
+  extras: { confirmed?: string; jobsCreated?: string },
+): string {
+  const params = new URLSearchParams();
+  params.set("konvejeris", code);
+  if (extras.confirmed) params.set("confirmed", extras.confirmed);
+  if (extras.jobsCreated) params.set("jobs", extras.jobsCreated);
+  return `/eile?${params.toString()}`;
+}
+
+export function EileQueueView({
+  data,
+  notice,
+  selectedCode,
+  confirmed,
+  jobsCreated,
+}: EileQueueViewProps) {
+  const lanes = sortLanes(data.lanes);
   const totalJobs = lanes.reduce((sum, lane) => sum + lane.jobs.length, 0);
-  const [selectedCode, setSelectedCode] = useState(() => defaultLaneCode(lanes));
+  const requested = selectedCode?.trim().toUpperCase();
+  const activeCode = lanes.some((lane) => lane.code === requested)
+    ? requested
+    : defaultLaneCode(lanes);
   const selectedLane =
-    lanes.find((lane) => lane.code === selectedCode) ?? lanes[0] ?? null;
+    lanes.find((lane) => lane.code === activeCode) ?? lanes[0] ?? null;
 
   return (
     <PageShell
@@ -77,8 +98,11 @@ export function EileQueueView({ data, notice }: EileQueueViewProps) {
         />
       ) : (
         <div className="space-y-6">
-          <div className="sticky top-0 z-20 -mx-4 border-b border-stone-line bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Konvejeriai">
+          <nav
+            aria-label="Konvejeriai"
+            className="sticky top-0 z-30 isolate -mx-4 border-b border-stone-line bg-background px-4 py-3 sm:-mx-6 sm:px-6"
+          >
+            <div className="grid grid-cols-2 gap-2">
               {lanes.map((lane) => {
                 const active = lane.code === selectedLane?.code;
                 const rate = formatPalletRateWithNorm(
@@ -91,29 +115,31 @@ export function EileQueueView({ data, notice }: EileQueueViewProps) {
                     : "nereguliuotas";
 
                 return (
-                  <button
+                  <Link
                     key={lane.code}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setSelectedCode(lane.code)}
+                    href={laneHref(lane.code, { confirmed, jobsCreated })}
+                    scroll={false}
+                    prefetch
+                    aria-current={active ? "page" : undefined}
                     className={cn(
-                      "min-w-[11rem] flex-1 rounded-2xl border px-4 py-3 text-left transition sm:flex-none",
+                      "relative z-10 pointer-events-auto min-h-[4.5rem] rounded-2xl border px-4 py-3 text-left no-underline transition",
                       active
                         ? "border-deisida bg-deisida text-deisida-foreground shadow-sm"
                         : "border-stone-line bg-paper text-ink hover:border-deisida/50",
                     )}
                   >
-                    <span className="block text-base font-semibold">
-                      {lane.code}
-                      <span className="font-normal opacity-80"> · {widthText}</span>
+                    <span className="block text-base font-semibold leading-snug">
+                      {lane.name?.trim() || lane.code}
+                    </span>
+                    <span className="mt-1 block text-sm opacity-90">
+                      {lane.code} · {widthText}
                     </span>
                     <span className="mt-1 block text-sm opacity-90">{rate}</span>
-                  </button>
+                  </Link>
                 );
               })}
             </div>
-          </div>
+          </nav>
           {selectedLane ? <LaneSection lane={selectedLane} /> : null}
         </div>
       )}

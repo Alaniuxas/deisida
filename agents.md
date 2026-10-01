@@ -58,15 +58,16 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 
 - SQLite: `data/deisida.db` (Drizzle schema in `src/lib/db/schema.ts`)
 - Import: `scripts/import-archive.ts` from Bubble archive zip
-- Machines: **KONV** / **KNEW** (`machines.shop_code` rezervuotas būsimiems cecho kodams)
-- Eilės našumas rodomas kaip **pal./d. · vnt./d.** (KONV 240 · 2700, KNEW 720 · 1700); pal./d. = eilės planas, vnt./d. = darbo norma iš CSV
+- Machines: **KONV** = Senas konvejeris (`id-code` **SK1** → `shop_code`, unique in machines CSV). **KNEW** = Naujas konvejeris; `id-code` is **NK1 and NK2** (same `identifier` KNEW) so `shop_code` is left empty — do not invent sk1/sk2. Pal./d. from machines CSV: KONV `goal_daily_rate_per_employee` 240, KNEW `goal_daily_rate` 720.
+- Eilės vnt./d.: tik KONV iš `Darbo_normos` eilutės „Plytų pjovimas plytelėmis – konvejeriu“ (2700). „Staklytėm“ 1700 **nėra** KNEW (CSV mašinos `STAK` / Staklytės). KNEW vnt./d. nerodomas — Bubble `Normas` turi daug KNEW* eilučių su skirtingais min kiekiais.
+- `/eile`: lipnūs **nuorodos**-tabai `?konvejeris=KONV|KNEW` (veikia be JS). Tabo antraštė — `machines.title` (Senas/Naujas konvejeris), po juo kodas + mm + pal./d. · vnt./d. jei yra. Numatytasis — pirmas konvejeris su darbais, kitaip KONV.
+- Demo eilė: `npm run db:seed-queue` importuoja ~30 jau patvirtintų Bubble pasiūlymų (esami nerūšiuojami).
 - Konvejerio rotacijos: periodai (`rotation_periods`), priskyrimai, istorija su priežastimi; demo: `npm run db:seed-rotation`
 - Cechas naudoja aktyvų rotacijos priskyrimą šiandienai; fallback — `machine_assignments`
 - Proposal form includes **adresas** (object address), persisted on `proposals.address`
 - `/eile`, `/cechas`, `/admin/konvejeriai` load data server-side (no client fetch/HMR dependency behind Cloudflare tunnel)
 - Gamybos eilė: `scheduleQueue` / `pickMachine` naudoja **DB** `machines.current_width_mm` (ne plotį iš eilės). Pirmiausia visi darbai, kurių plotis = konvejerio W, eina į tą konvejerį (globaliai, ne pagal užsakymą). Likę — į konvejerį su mažiausiu `|currentWidth − jobWidth|`, lygios → ankstesnis laisvumas. `splitAcrossMachines` nebėra: tas pats užsakymas gali likti viename konvejeryje, jei arčiau. Konvejeryje: `orderJobsByWidthCorrection` (nearest-neighbor nuo dabartinio pločio).
-- `/eile`: viršuje lipnūs KONV/KNEW tabai (pavadinimas + mm + pal./d. · vnt./d.); matomas tik pasirinktas konvejeris. Numatytasis — pirmas konvejeris su darbais, kitaip KONV. Antraštė trumpa: „Kitas darbas pagal konvejerį ir plotį.“
-- UI rodo KONV/KNEW ir pal./d. · vnt./d. ant tabor ir gamybos plane; reguliavimas 30 min. **Rotacija 4 val.** nerodoma `/eile` ir `/cechas` (admin laukas lieka).
+- `/eile`: viršuje lipnūs KONV/KNEW tabai su tikrais pavadinimais; matomas tik pasirinktas konvejeris. Antraštė: „Kitas darbas pagal konvejerį ir plotį.“
 - Admin ir `/eile` naudoja tą patį efektyvų konvejerio plotį (`getEffectiveMachineWidth`: DB → aktyvus darbas → eilėje).
 - Pjūviai (baras): native `<select>` su „Nežinau“.
 - `Pridėti eilutę`: GET `formMethod` ant to paties formos (RT4). **Patvirtinti** / juodraštis — native `POST /api/proposals/submit` (303 `/eile`), veikia be JS.

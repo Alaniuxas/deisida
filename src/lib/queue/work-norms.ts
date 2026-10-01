@@ -5,26 +5,6 @@ import { db } from "@/lib/db";
 import { workNorms } from "@/lib/db/schema";
 import type { MachineCode } from "@/lib/production-types";
 
-const DEFAULT_NORMS: {
-  machineCode: MachineCode;
-  label: string;
-  minPiecesPerDay: number;
-  sourceRow: string;
-}[] = [
-  {
-    machineCode: "KONV",
-    label: "Plytų pjovimas plytelėmis – konvejeriu",
-    minPiecesPerDay: 2700,
-    sourceRow: "Plytų pjovimas plytelėmis – konvejeriu",
-  },
-  {
-    machineCode: "KNEW",
-    label: "Plytų pjovimas plytelėmis – staklytėm",
-    minPiecesPerDay: 1700,
-    sourceRow: "Plytų pjovimas plytelėmis – staklytėm",
-  },
-];
-
 const CSV_CANDIDATES = [
   process.env.WORK_NORMS_CSV,
   "/home/ubuntu/.cursor/projects/workspace/uploads/Darbo_normos_Deisida_937b.csv",
@@ -52,56 +32,69 @@ function findMinInRow(row: Record<string, string>): number | null {
   return null;
 }
 
-function matchNorm(rowText: string): (typeof DEFAULT_NORMS)[number] | null {
-  const normalized = rowText.toLowerCase();
-  if (normalized.includes("konvejer")) {
-    return DEFAULT_NORMS.find((item) => item.machineCode === "KONV") ?? null;
-  }
-  if (normalized.includes("staklyt")) {
-    return DEFAULT_NORMS.find((item) => item.machineCode === "KNEW") ?? null;
-  }
-  return null;
+/** Only the unique “plytelėmis – konvejeriu” row maps to KONV. Staklytėm is STAK, not KNEW. */
+function matchKonvTileCutting(label: string): boolean {
+  const normalized = label.toLowerCase().replace(/\s+/g, " ");
+  return (
+    normalized.includes("pjovimas plytelėmis") &&
+    normalized.includes("konvejer")
+  );
 }
 
-export function parseWorkNormsFromCsv(csvPath: string): typeof DEFAULT_NORMS {
-  const content = fs.readFileSync(csvPath, "utf8");
-  const rows = parse(content, {
+export function parseWorkNormsFromCsv(csvPath: string): {
+  machineCode: MachineCode;
+  label: string;
+  minPiecesPerDay: number;
+  sourceRow: string;
+}[] {
+  const raw = fs.readFileSync(csvPath, "utf8");
+  const lines = raw.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) =>
+    line.startsWith("Darbo pavadinimas"),
+  );
+  const csvBody =
+    headerIndex >= 0 ? lines.slice(headerIndex).join("\n") : raw;
+
+  const rows = parse(csvBody, {
     columns: true,
     skip_empty_lines: true,
     relax_column_count: true,
     trim: true,
   }) as Record<string, string>[];
 
-  const found = new Map<MachineCode, (typeof DEFAULT_NORMS)[number]>();
+  const found: {
+    machineCode: MachineCode;
+    label: string;
+    minPiecesPerDay: number;
+    sourceRow: string;
+  }[] = [];
 
   for (const row of rows) {
     const label =
+      row["Darbo pavadinimas"] ??
       row.label ??
       row.name ??
       row.title ??
-      row["Darbo operacija"] ??
-      row["Operacija"] ??
       Object.values(row)[0] ??
       "";
-    const norm = matchNorm(label);
-    if (!norm) continue;
-
+    if (!matchKonvTileCutting(label)) continue;
     const minValue = findMinInRow(row);
-    found.set(norm.machineCode, {
-      ...norm,
-      minPiecesPerDay: minValue ?? norm.minPiecesPerDay,
-      sourceRow: label.trim() || norm.sourceRow,
+    if (minValue == null) continue;
+    found.push({
+      machineCode: "KONV",
+      label: label.trim(),
+      minPiecesPerDay: minValue,
+      sourceRow: label.trim(),
     });
+    break;
   }
 
-  return DEFAULT_NORMS.map(
-    (fallback) => found.get(fallback.machineCode) ?? fallback,
-  );
+  return found;
 }
 
 export async function importWorkNorms(csvPath?: string): Promise<number> {
   const resolved = csvPath ?? resolveWorkNormsCsvPath();
-  const norms = resolved ? parseWorkNormsFromCsv(resolved) : DEFAULT_NORMS;
+  const norms = resolved ? parseWorkNormsFromCsv(resolved) : [];
   const importedAt = new Date().toISOString();
 
   await db.delete(workNorms);
@@ -134,5 +127,3 @@ export async function ensureWorkNorms(): Promise<void> {
     await importWorkNorms();
   }
 }
-
-export { DEFAULT_NORMS };

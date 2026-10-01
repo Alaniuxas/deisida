@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { parse } from "csv-parse/sync";
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
 import { db, initializeDatabase } from "../src/lib/db";
 import {
   users,
@@ -11,6 +10,7 @@ import {
   machines,
   discs,
 } from "../src/lib/db/schema";
+import { syncQueueMachinesFromArchive } from "../src/lib/queue/archive-machines";
 
 const ARCHIVE_PATH =
   process.env.ARCHIVE_PATH ??
@@ -202,45 +202,8 @@ async function importClients(): Promise<number> {
 }
 
 async function importMachines(): Promise<number> {
-  const rows = readCsv("export_All-Machines-modified--_2026-09-28_08-28-42.csv");
-  const targets = new Map<
-    string,
-    { dailyRate: number; title: string }
-  >([
-    ["KONV", { dailyRate: 240, title: "Senas konvejeris" }],
-    ["KNEW", { dailyRate: 720, title: "Naujas konvejeris" }],
-  ]);
-
-  const importedCodes = new Set<string>();
-  let count = 0;
-  for (const row of rows) {
-    const code = row.identifier?.trim();
-    if (!code || !targets.has(code) || importedCodes.has(code)) continue;
-
-    const config = targets.get(code)!;
-    importedCodes.add(code);
-
-    await db
-      .insert(machines)
-      .values({
-        id: code,
-        code,
-        title: row.title?.trim() || config.title,
-        dailyRate: config.dailyRate,
-        rotationHours: null,
-        currentWidthMm: null,
-      })
-      .onConflictDoUpdate({
-        target: machines.id,
-        set: {
-          title: row.title?.trim() || config.title,
-          dailyRate: config.dailyRate,
-        },
-      });
-    count += 1;
-  }
-
-  return count;
+  const synced = await syncQueueMachinesFromArchive();
+  return synced.length;
 }
 
 async function main(): Promise<void> {

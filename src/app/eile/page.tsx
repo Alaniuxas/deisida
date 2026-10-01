@@ -8,7 +8,11 @@ export const dynamic = "force-dynamic";
 export default async function EilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ confirmed?: string; jobs?: string }>;
+  searchParams: Promise<{
+    confirmed?: string;
+    jobs?: string;
+    konvejeris?: string;
+  }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/prisijungti?next=/eile");
@@ -25,5 +29,13 @@ export default async function EilePage({
         ? `Patvirtinta ${params.confirmed}.`
         : null;
 
-  return <EileQueueView data={queue} notice={notice} />;
+  return (
+    <EileQueueView
+      data={queue}
+      notice={notice}
+      selectedCode={params.konvejeris}
+      confirmed={params.confirmed}
+      jobsCreated={params.jobs}
+    />
+  );
 }
