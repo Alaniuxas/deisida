@@ -77,7 +77,17 @@ interface BuiltSchedule {
   planRunId: string | null;
 }
 
-function parsePackaging(json: string): PackagingOptions {
+function sanitizeAiComments(
+  comments: string[],
+  source: "claude" | "mock" | null,
+): string[] {
+  if (source !== "mock") return comments;
+  return comments.filter(
+    (comment) =>
+      !comment.includes("AI_GATEWAY_API_KEY") &&
+      !/gateway neprijungtas|claude neprijungtas/i.test(comment),
+  );
+}
   try {
     return { ...defaultPackaging(), ...JSON.parse(json) };
   } catch {
@@ -266,7 +276,10 @@ async function buildSchedule(): Promise<BuiltSchedule | null> {
       endIso: latestRun.lockedWeekEnd,
     };
     try {
-      aiComments = JSON.parse(latestRun.aiCommentsJson) as string[];
+      aiComments = sanitizeAiComments(
+        JSON.parse(latestRun.aiCommentsJson) as string[],
+        latestRun.aiSource === "claude" ? "claude" : "mock",
+      );
     } catch {
       aiComments = [];
     }

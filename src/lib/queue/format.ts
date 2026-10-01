@@ -24,6 +24,7 @@ export function formatScheduleTimestamp(value: string | Date): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString("lt-LT", {
+    timeZone: "Europe/Vilnius",
     month: "short",
     day: "numeric",
     hour: "2-digit",

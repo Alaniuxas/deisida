@@ -7,6 +7,7 @@ import {
   SHIFT_HOURS,
   createDefaultMachines,
 } from "./constants";
+import { addWorkDuration } from "./work-hours";
 import { orderJobsByP1P2P3 } from "./width-order";
 import type {
   Assignment,
@@ -274,10 +275,6 @@ export function pickMachine(
   return states.find((state) => state.id === pickedId) ?? states[0];
 }
 
-function addHours(referenceTime: Date, hours: number): Date {
-  return new Date(referenceTime.getTime() + hours * 60 * 60 * 1000);
-}
-
 function jobPriority(
   job: QueueJob,
   previous: QueueJob | null,
@@ -326,6 +323,7 @@ export function scheduleQueue(
     );
     let runningWidthMm = storedWidthOrUnknown(machine.currentWidthMm);
     let elapsedHours = 0;
+    let cursor = referenceTime;
     let previous: QueueJob | null = null;
 
     for (const job of orderedJobs) {
@@ -335,8 +333,10 @@ export function scheduleQueue(
         runningWidthMm,
       );
       const pick = picks.get(job.id);
-      const estimatedStart = addHours(referenceTime, elapsedHours);
-      const estimatedEnd = addHours(referenceTime, elapsedHours + durationHours);
+      const { start: estimatedStart, end: estimatedEnd } = addWorkDuration(
+        cursor,
+        durationHours,
+      );
 
       assignments.push({
         jobId: job.id,
@@ -358,6 +358,7 @@ export function scheduleQueue(
       });
 
       elapsedHours += durationHours;
+      cursor = estimatedEnd;
       runningWidthMm = job.tileWidthMm;
       previous = job;
     }

@@ -26,6 +26,7 @@ interface EileQueueViewProps {
   confirmed?: string;
   jobsCreated?: string;
   canEdit?: boolean;
+  isAdmin?: boolean;
 }
 
 function quantityText(
@@ -80,6 +81,7 @@ export function EileQueueView({
   confirmed,
   jobsCreated,
   canEdit = false,
+  isAdmin = false,
 }: EileQueueViewProps) {
   const lanes = sortLanes(data.lanes);
   const totalJobs = lanes.reduce((sum, lane) => sum + lane.jobs.length, 0);
@@ -132,12 +134,24 @@ export function EileQueueView({
         </p>
       )}
 
-      {data.aiComments.length > 0 ? (
+      {data.aiSource === "mock" ? (
         <div className="rounded-xl border border-stone-line bg-paper px-4 py-3 text-sm">
-          <p className="mb-2 font-medium text-ink">
-            AI pastabos
-            {data.aiSource === "mock" ? " (mock — Gateway neprijungtas)" : " (Claude)"}
+          <p className="font-medium text-ink">
+            AI patarimai dar neįjungti. Norėdami įjungti — žr. instrukciją žemiau
+            arba kreipkitės į administratorių.
           </p>
+          {isAdmin ? <AiGatewayAdminHelp /> : null}
+          {data.aiComments.length > 0 ? (
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-muted-foreground">
+              {data.aiComments.map((comment) => (
+                <li key={comment}>{comment}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : data.aiComments.length > 0 ? (
+        <div className="rounded-xl border border-stone-line bg-paper px-4 py-3 text-sm">
+          <p className="mb-2 font-medium text-ink">AI pastabos (Claude)</p>
           <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
             {data.aiComments.map((comment) => (
               <li key={comment}>{comment}</li>
@@ -208,6 +222,38 @@ export function EileQueueView({
         </div>
       )}
     </PageShell>
+  );
+}
+
+function AiGatewayAdminHelp() {
+  return (
+    <details className="mt-3 rounded-lg border border-stone-line bg-muted/40 px-3 py-2">
+      <summary className="cursor-pointer font-medium text-ink">
+        Kaip įjungti Vercel AI Gateway (administratoriui)
+      </summary>
+      <ol className="mt-2 list-decimal space-y-2 pl-5 text-muted-foreground">
+        <li>
+          Atidarykite{" "}
+          <a
+            href="https://vercel.com/dashboard/ai-gateway"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-deisida underline"
+          >
+            Vercel AI Gateway
+          </a>{" "}
+          savo komandos projekte.
+        </li>
+        <li>Sukurkite arba pasirinkite Gateway raktą projektui „Deisida“.</li>
+        <li>
+          Vercel projekto Environment Variables pridėkite{" "}
+          <code className="rounded bg-paper px-1">AI_GATEWAY_API_KEY</code> (Production
+          ir Preview).
+        </li>
+        <li>Perdeployinkite projektą arba paleiskite naują preview — API rakto į
+          chatą įklijuoti nereikia.</li>
+      </ol>
+    </details>
   );
 }
 

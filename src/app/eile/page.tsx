@@ -43,6 +43,7 @@ export default async function EilePage({
       confirmed={params.confirmed}
       jobsCreated={params.jobs}
       canEdit={["admin", "pardavimai"].includes(user.role)}
+      isAdmin={user.role === "admin"}
     />
   );
 }

@@ -50,8 +50,9 @@ Starter password for all imported users: **`deisida`**
 
 - `jobs.storisMm` is cut-tile thickness (proposal line / `default_storis_mm`), **not** `tiles.heightMm`.
 - Engine (`src/lib/queue/schedule.ts`): P1 same width+storis clustered; P2 same width; P3 deadline. Empty machine gets the **farthest** width (≥20 mm), so 101+102 stay with a 100 mm machine.
+- **Work hours:** planned start/end only **Mon–Fri 08:00–17:00 Europe/Vilnius** (`src/lib/queue/work-hours.ts`). Overflow past 17:00 continues next workday at 08:00.
 - Friday **00:00 Europe/Vilnius** (`vercel.json` cron `0 0 * * 5` → `/api/cron/queue-plan`). UI shows next Mon–Sun. PATCH/POST `/api/jobs/queue/override` → **403** outside that week.
-- Claude `anthropic/claude-sonnet-4.6` via AI Gateway: audit comments only. Mock if no `AI_GATEWAY_API_KEY`.
+- Claude `anthropic/claude-sonnet-4.6` via Vercel AI Gateway: audit comments only. Without Gateway, `/eile` shows friendly LT copy + admin setup steps (`AI_GATEWAY_API_KEY` in env only).
 - ICE confirm: `POST /api/proposals/submit` still 303 `/eile`.
 
 ## API

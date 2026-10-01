@@ -60,10 +60,7 @@ export async function auditQueuePlan(input: AuditInput): Promise<AuditResult> {
   const mock = heuristicComments(input);
   if (!process.env.AI_GATEWAY_API_KEY) {
     return {
-      comments: [
-        "Claude neprijungtas (nėra AI_GATEWAY_API_KEY) — mock pastabos, eilės engine veikia.",
-        ...mock,
-      ],
+      comments: mock,
       source: "mock",
     };
   }
@@ -104,7 +101,7 @@ Overrides: ${JSON.stringify(input.overrides.slice(0, 20), null, 2)}`;
     } catch {
       return {
         comments: [
-          "Claude/Gateway kvietimas nepavyko — mock pastabos, eilės engine veikia.",
+          "AI patarimų generavimas laikinai nepasiekiamas — rodomos automatinės pastabos.",
           ...mock,
         ],
         source: "mock",
