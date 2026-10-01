@@ -18,6 +18,7 @@ import {
   formatDurationHours,
   formatScheduleTimestamp,
 } from "@/lib/queue/format";
+import { formatPalletRateWithNorm } from "@/lib/queue/rate-labels";
 import type { ShopJob } from "@/lib/production-types";
 
 const FINISH_REASON_PRESETS = [
@@ -148,12 +149,15 @@ export function CechasJobPanel({ job, notice, error }: CechasJobPanelProps) {
             <div className="rounded-xl border border-stone-line bg-muted/30 px-4 py-4">
               <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Cog className="size-4" />
-                Gamybos planas ({schedule.conveyorShopCode})
+                Gamybos planas ({schedule.conveyorCode})
               </div>
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <PlanItem
                   label="Našumas (eilėje)"
-                  value={`${schedule.dailyRatePallets} pal./d.`}
+                  value={formatPalletRateWithNorm(
+                    schedule.dailyRatePallets,
+                    schedule.workNormPiecesPerDay,
+                  )}
                 />
                 <PlanItem
                   label="Pjovimas"

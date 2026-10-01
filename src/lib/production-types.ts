@@ -9,6 +9,7 @@ export interface ConveyorInfo {
   name: string;
   currentWidthMm?: number;
   dailyRatePallets?: number;
+  workNormPiecesPerDay?: number;
   rotationHours?: number;
   changeoverMinutes?: number;
 }
@@ -32,6 +33,7 @@ export interface JobScheduleInfo {
   conveyorName: string;
   machineCurrentWidthMm: number;
   dailyRatePallets: number;
+  workNormPiecesPerDay?: number;
   rotationHours: number;
   changeoverMinutes: number;
   quantityPallets: number;
@@ -106,6 +108,7 @@ export interface QueueLane {
   widthSource: MachineWidthSource;
   widthHint: string | null;
   dailyRatePallets: number;
+  workNormPiecesPerDay?: number;
   rotationHours: number;
   changeoverMinutes: number;
   jobs: QueueJob[];

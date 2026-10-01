@@ -5,6 +5,10 @@ import { ConveyorSwitchForm } from "@/components/production/conveyor-switch-form
 import { CechasJobPanel } from "@/components/production/cechas-job-panel";
 import { EmptyState } from "@/components/production/async-state";
 import { PageShell } from "@/components/production/page-shell";
+import {
+  conveyorDisplayLabel,
+  formatPalletRateWithNorm,
+} from "@/lib/queue/rate-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +63,7 @@ export default async function CechasPage({
       title="Cechas"
       subtitle={
         conveyor
-          ? `Jūsų konvejeris: ${conveyor.shopCode} — ${conveyor.name} · Našumas (eilėje): ${conveyor.dailyRatePallets ?? "—"} pal./d. · rotacija ${conveyor.rotationHours ?? "—"} val.`
+          ? `Jūsų konvejeris: ${conveyorDisplayLabel(conveyor.code, conveyor.name)} · Našumas (eilėje): ${formatPalletRateWithNorm(conveyor.dailyRatePallets ?? 0, conveyor.workNormPiecesPerDay)} · rotacija ${conveyor.rotationHours ?? "—"} val.`
           : "Kitas darbas jūsų konvejeryje"
       }
     >

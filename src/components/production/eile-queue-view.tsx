@@ -9,6 +9,10 @@ import {
   formatScheduleTimestamp,
 } from "@/lib/queue/format";
 import { machineWidthLabel } from "@/lib/queue/machine-width";
+import {
+  conveyorDisplayLabel,
+  formatPalletRateWithNorm,
+} from "@/lib/queue/rate-labels";
 import type { QueueLane, QueueResponse } from "@/lib/production-types";
 
 interface EileQueueViewProps {
@@ -26,13 +30,27 @@ function quantityText(
   return count === 1 ? "1 vnt." : `${count} vnt.`;
 }
 
+function buildRateSubtitle(lanes: QueueLane[]): string {
+  if (lanes.length === 0) {
+    return "Planas pagal konvejerį: artimiausias plotis → terminas.";
+  }
+
+  const rates = lanes
+    .map((lane) =>
+      `${lane.code} ${formatPalletRateWithNorm(lane.dailyRatePallets, lane.workNormPiecesPerDay)}`,
+    )
+    .join(" · ");
+
+  return `Planas pagal konvejerį: artimiausias plotis → terminas. Našumas: ${rates} + reguliavimas.`;
+}
+
 export function EileQueueView({ data, notice }: EileQueueViewProps) {
   const totalJobs = data.lanes.reduce((sum, lane) => sum + lane.jobs.length, 0);
 
   return (
     <PageShell
       title="Gamybinė eilė"
-      subtitle="Planas pagal konvejerį: artimiausias plotis → terminas. Našumas eilėje: sk1 240 / sk2 720 pal./d. (ne vnt./d.) + reguliavimas."
+      subtitle={buildRateSubtitle(data.lanes)}
       wide
     >
       {notice ? (
@@ -57,14 +75,18 @@ export function EileQueueView({ data, notice }: EileQueueViewProps) {
 }
 
 function LaneSection({ lane }: { lane: QueueLane }) {
+  const laneLabel = conveyorDisplayLabel(lane.code, lane.name);
+  const laneRate = formatPalletRateWithNorm(
+    lane.dailyRatePallets,
+    lane.workNormPiecesPerDay,
+  );
+
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-xl font-semibold text-ink">
-          {lane.shopCode} — {lane.name}
-        </h2>
+        <h2 className="text-xl font-semibold text-ink">{laneLabel}</h2>
         <Badge className="bg-deisida text-deisida-foreground">
-          Našumas (eilėje): {lane.dailyRatePallets} pal./d.
+          Našumas (eilėje): {laneRate}
         </Badge>
         <Badge variant="secondary">
           Rotacija {lane.rotationHours} val.
@@ -98,14 +120,14 @@ function LaneSection({ lane }: { lane: QueueLane }) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-muted-foreground">
-                      #{job.schedule?.positionInQueue ?? "—"} eilėje · {lane.shopCode}
+                      #{job.schedule?.positionInQueue ?? "—"} eilėje · {lane.code}
                     </p>
                     <CardTitle className="text-lg font-semibold leading-snug">
                       {job.tileName}
                     </CardTitle>
                   </div>
                   <Badge className="bg-deisida text-deisida-foreground">
-                    {lane.shopCode}
+                    {lane.code}
                   </Badge>
                 </div>
                 <p className="text-base text-muted-foreground">
@@ -147,12 +169,15 @@ function LaneSection({ lane }: { lane: QueueLane }) {
                   <div className="rounded-xl border border-stone-line bg-muted/30 p-4">
                     <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                       <Cog className="size-4" />
-                      Gamybos planas ({lane.shopCode})
+                      Gamybos planas ({lane.code})
                     </div>
                     <dl className="grid gap-2 text-sm sm:grid-cols-2">
                       <PlanRow
                         label="Našumas (eilėje)"
-                        value={`${job.schedule.dailyRatePallets} pal./d.`}
+                        value={formatPalletRateWithNorm(
+                          job.schedule.dailyRatePallets,
+                          job.schedule.workNormPiecesPerDay,
+                        )}
                       />
                       <PlanRow
                         label="Paletės"

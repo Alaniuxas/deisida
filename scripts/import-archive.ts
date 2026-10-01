@@ -205,10 +205,10 @@ async function importMachines(): Promise<number> {
   const rows = readCsv("export_All-Machines-modified--_2026-09-28_08-28-42.csv");
   const targets = new Map<
     string,
-    { dailyRate: number; title: string; shopCode: string }
+    { dailyRate: number; title: string }
   >([
-    ["KONV", { dailyRate: 240, title: "Senas konvejeris", shopCode: "sk1" }],
-    ["KNEW", { dailyRate: 720, title: "Naujas konvejeris", shopCode: "sk2" }],
+    ["KONV", { dailyRate: 240, title: "Senas konvejeris" }],
+    ["KNEW", { dailyRate: 720, title: "Naujas konvejeris" }],
   ]);
 
   const importedCodes = new Set<string>();
@@ -225,7 +225,6 @@ async function importMachines(): Promise<number> {
       .values({
         id: code,
         code,
-        shopCode: config.shopCode,
         title: row.title?.trim() || config.title,
         dailyRate: config.dailyRate,
         rotationHours: null,
@@ -234,7 +233,6 @@ async function importMachines(): Promise<number> {
       .onConflictDoUpdate({
         target: machines.id,
         set: {
-          shopCode: config.shopCode,
           title: row.title?.trim() || config.title,
           dailyRate: config.dailyRate,
         },

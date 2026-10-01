@@ -338,7 +338,7 @@ export function CechasScreen({ initialData, embedded = false }: CechasScreenProp
       title="Cechas"
       subtitle={
         conveyor
-          ? `Jūsų konvejeris: ${conveyor.shopCode} — ${conveyor.name}`
+          ? `Jūsų konvejeris: ${conveyor.code} — ${conveyor.name}`
           : "Kitas darbas jūsų konvejeryje"
       }
     >

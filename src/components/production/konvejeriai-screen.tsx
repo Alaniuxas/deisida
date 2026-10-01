@@ -25,6 +25,7 @@ import {
   LoadingState,
 } from "@/components/production/async-state";
 import { PageShell } from "@/components/production/page-shell";
+import { formatPalletRateWithNorm } from "@/lib/queue/rate-labels";
 import {
   createRotationPeriod,
   fetchAssignments,
@@ -390,7 +391,7 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
       : MACHINE_ORDER.map((code) => ({
           id: `placeholder-${code}`,
           code,
-          shopCode: code === "KONV" ? "sk1" : "sk2",
+          shopCode: code,
           name: code === "KONV" ? "Konvejeris" : "Naujas konvejeris",
           dailyRatePallets: 0,
           rotationHours: 8,
@@ -530,8 +531,8 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
             <TabsContent value="konvejeriai" className="space-y-6">
               <p className="text-sm text-muted-foreground">
                 Eilės planavimui naudojamos <strong>paletės per dieną</strong>{" "}
-                (sk1 240 / sk2 720 pal./d.). Darbo normos (vnt./d., pvz. 2700 /
-                1700) rodomos viršuje — atskira CSV metrika, ne eilės našumas.
+                (KONV 240 / KNEW 720 pal./d., kartu su vnt./d. iš darbo normų).
+                Cecho kodų (sk1 ir pan.) logiką nustatysime vėliau.
               </p>
               <MachineSettingsGrid
                 displayMachines={displayMachines}
@@ -627,9 +628,13 @@ function WorkNormsBanner({
             >
               <div className="mb-2 flex items-center gap-2">
                 <Badge className="bg-deisida text-deisida-foreground">
-                  {machine?.shopCode ?? (code === "KONV" ? "sk1" : "sk2")}
+                  {code}
                 </Badge>
-                <span className="text-xs text-muted-foreground">({code})</span>
+                {machine?.name ? (
+                  <span className="text-xs text-muted-foreground">
+                    ({machine.name})
+                  </span>
+                ) : null}
               </div>
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">
@@ -641,9 +646,14 @@ function WorkNormsBanner({
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">
-                  Eilės planas (pal./d.):
+                  Eilės planas:
                 </span>{" "}
-                {machine?.dailyRatePallets ?? "—"} pal./d.
+                {machine
+                  ? formatPalletRateWithNorm(
+                      machine.dailyRatePallets,
+                      norm?.minPiecesPerDay,
+                    )
+                  : "—"}
               </p>
             </div>
           );
@@ -685,7 +695,7 @@ function AssignmentGrid({
             <CardHeader className="border-b border-stone-line pb-4">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <span className="rounded-lg bg-deisida px-2.5 py-1 text-sm font-bold text-deisida-foreground">
-                  {machine.shopCode}
+                  {machine.code}
                 </span>
                 {machine.name}
               </CardTitle>
@@ -716,7 +726,7 @@ function AssignmentGrid({
                   </div>
                 ) : (
                   <p className="mb-4 rounded-xl border border-dashed border-stone-line px-4 py-3 text-base text-muted-foreground">
-                    Dar niekas nepriskirtas {machine.shopCode}.
+                    Dar niekas nepriskirtas {machine.code}.
                   </p>
                 )}
 
@@ -747,8 +757,7 @@ function AssignmentGrid({
                           {otherCode ? (
                             <span className="ml-2 text-sm text-muted-foreground">
                               (dabar{" "}
-                              {displayMachines.find((item) => item.code === otherCode)
-                                ?.shopCode ?? otherCode}
+                              {otherCode}
                               )
                             </span>
                           ) : (
@@ -810,22 +819,13 @@ function MachineSettingsGrid({
           >
             <CardHeader className="border-b border-stone-line pb-4">
               <CardTitle className="text-xl">
-                {machine.shopCode}{" "}
+                {machine.code}{" "}
                 <span className="text-sm font-normal text-muted-foreground">
-                  ({machine.code})
+                  ({machine.name})
                 </span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 pt-5 sm:grid-cols-2 lg:grid-cols-4">
-              <ShopCodeField
-                id={`shop-${machine.id}`}
-                label="Cecho kodas (rodomas eilėje)"
-                value={draft.shopCode}
-                onChange={(value) =>
-                  updateMachineDraft(machine.id, "shopCode", value)
-                }
-                disabled={showEmptyMachines}
-              />
+            <CardContent className="grid gap-4 pt-5 sm:grid-cols-2 lg:grid-cols-3">
               <Field
                 id={`rate-${machine.id}`}
                 label="Paletės per dieną (eilė)"

@@ -36,14 +36,14 @@ async function seedMachines(): Promise<void> {
     {
       id: "KONV",
       code: "KONV",
-      shopCode: "sk1",
+      shopCode: null,
       title: "Senas konvejeris",
       dailyRate: 240,
     },
     {
       id: "KNEW",
       code: "KNEW",
-      shopCode: "sk2",
+      shopCode: null,
       title: "Naujas konvejeris",
       dailyRate: 720,
     },

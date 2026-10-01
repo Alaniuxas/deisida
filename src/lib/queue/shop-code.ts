@@ -1,18 +1,6 @@
 import type { MachineCode } from "@/lib/production-types";
 
-export const DEFAULT_SHOP_CODES: Record<MachineCode, string> = {
-  KONV: "sk1",
-  KNEW: "sk2",
-};
-
-export function defaultShopCode(code: string): string {
-  if (code === "KONV" || code === "KNEW") {
-    return DEFAULT_SHOP_CODES[code];
-  }
-
-  return code.toLowerCase();
-}
-
+/** Optional cecho label; falls back to internal machine code (KONV/KNEW). */
 export function resolveShopCode(
   code: string,
   shopCode: string | null | undefined,
@@ -21,5 +9,9 @@ export function resolveShopCode(
     return shopCode.trim();
   }
 
-  return defaultShopCode(code);
+  return code;
+}
+
+export function isMachineCode(value: string): value is MachineCode {
+  return value === "KONV" || value === "KNEW";
 }

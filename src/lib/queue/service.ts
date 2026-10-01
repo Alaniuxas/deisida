@@ -16,6 +16,7 @@ import {
   getActiveRotationMachineId,
 } from "@/lib/queue/rotations";
 import { resolveShopCode } from "@/lib/queue/shop-code";
+import { ensureWorkNorms, getWorkNorms } from "@/lib/queue/work-norms";
 import { scheduleQueue } from "@/lib/queue/schedule";
 import { orderJobsByWidthCorrection } from "@/lib/queue/width-order";
 import type { Machine as PlannerMachine, QueueJob as PlannerJob } from "@/lib/queue/types";
@@ -162,16 +163,16 @@ function buildAssignmentReason(
   splitProposalWidths: Set<string>,
 ): string {
   const proposalKey = job.proposalId;
-  const shopCode = machineShopCode(machine);
+  const conveyorLabel = machine.code;
   const widthMatches =
     machineCurrentWidthMm > 0 && job.widthMm === machineCurrentWidthMm;
 
   if (splitProposalWidths.has(proposalKey)) {
-    return `Užsakyme keli plytų plotiai — priskirta ${shopCode}, kad nereikėtų reguliuoti konvejerio.`;
+    return `Užsakyme keli plytų plotiai — priskirta ${conveyorLabel}, kad nereikėtų reguliuoti konvejerio.`;
   }
 
   if (widthMatches) {
-    return `Konvejeris ${shopCode} jau sureguliuotas ${job.widthMm} mm pločiui — artimiausias plotis, tada terminas.`;
+    return `Konvejeris ${conveyorLabel} jau sureguliuotas ${job.widthMm} mm pločiui — artimiausias plotis, tada terminas.`;
   }
 
   if (requiresChangeover && machineCurrentWidthMm > 0) {
@@ -179,10 +180,10 @@ function buildAssignmentReason(
   }
 
   if (machineCurrentWidthMm === 0) {
-    return `Konvejeris ${shopCode} dar nereguliuotas — darbas planuojamas pagal ${job.widthMm} mm plotį ir terminą.`;
+    return `Konvejeris ${conveyorLabel} dar nereguliuotas — darbas planuojamas pagal ${job.widthMm} mm plotį ir terminą.`;
   }
 
-  return `Priskirta ${shopCode} pagal eilės tvarką (mažiausias plotio koregavimas, tada terminas).`;
+  return `Priskirta ${conveyorLabel} pagal eilės tvarką (mažiausias plotio koregavimas, tada terminas).`;
 }
 
 async function buildSchedule(): Promise<BuiltSchedule | null> {
@@ -225,6 +226,7 @@ function toJobScheduleInfo(
   machine: (typeof machines.$inferSelect),
   positionInQueue: number,
   assignmentReason: string,
+  workNormPiecesPerDay?: number,
 ): JobScheduleInfo {
   const productionHours = assignment.durationHours - assignment.changeoverHours;
 
@@ -236,6 +238,7 @@ function toJobScheduleInfo(
     conveyorName: machine.title,
     machineCurrentWidthMm: machine.currentWidthMm ?? 0,
     dailyRatePallets: machine.dailyRate,
+    workNormPiecesPerDay,
     rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
     changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
     quantityPallets: toPalletCount(job),
@@ -317,6 +320,12 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     return { lanes: [], groups: [] };
   }
 
+  await ensureWorkNorms();
+  const workNormRows = await getWorkNorms();
+  const workNormByCode = new Map(
+    workNormRows.map((norm) => [norm.machineCode as MachineCode, norm.minPiecesPerDay]),
+  );
+
   const splitProposalWidths = detectSplitProposalWidths(built.jobRows);
   const lanes: QueueLane[] = [];
   const grouped = new Map<number, QueueWidthGroup>();
@@ -345,6 +354,8 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     );
     const machineCurrentWidthMm = effectiveWidth.widthMm;
     const ordered = sortJobsForLane(machineJobs, machineCurrentWidthMm);
+    const machineCode = machine.code as MachineCode;
+    const workNormPiecesPerDay = workNormByCode.get(machineCode);
 
     const laneJobs: ApiQueueJob[] = ordered.map(({ job, assignment }, index) => {
       const requiresChangeover = assignment.changeoverHours > 0;
@@ -361,6 +372,7 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
         machine,
         index + 1,
         assignmentReason,
+        workNormPiecesPerDay,
       );
       const apiJob = toApiQueueJob(job, schedule);
 
@@ -372,13 +384,14 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     });
 
     lanes.push({
-      code: machine.code as MachineCode,
+      code: machineCode,
       shopCode: machineShopCode(machine),
       name: machine.title,
       currentWidthMm: machineCurrentWidthMm,
       widthSource: effectiveWidth.source,
       widthHint: machineWidthHint(effectiveWidth),
       dailyRatePallets: machine.dailyRate,
+      workNormPiecesPerDay,
       rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
       changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
       jobs: laneJobs,
@@ -475,6 +488,7 @@ export async function getNextJobForUser(userId: string): Promise<NextJobResponse
     name: machine.title,
     currentWidthMm: lane?.currentWidthMm ?? machine.currentWidthMm ?? 0,
     dailyRatePallets: machine.dailyRate,
+    workNormPiecesPerDay: lane?.workNormPiecesPerDay,
     rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
     changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
   };

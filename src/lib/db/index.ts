@@ -191,8 +191,7 @@ export function initializeDatabase(): void {
   }
 
   sqlite.exec(`
-    UPDATE machines SET shop_code = 'sk1' WHERE code = 'KONV' AND (shop_code IS NULL OR shop_code = '');
-    UPDATE machines SET shop_code = 'sk2' WHERE code = 'KNEW' AND (shop_code IS NULL OR shop_code = '');
+    UPDATE machines SET shop_code = NULL WHERE shop_code IN ('sk1', 'sk2');
   `);
 }
 
