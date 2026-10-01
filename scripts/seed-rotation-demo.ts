@@ -59,6 +59,20 @@ async function seedMachines(): Promise<void> {
   }
 }
 
+async function resolveUserId(email: string): Promise<string> {
+  const [row] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+
+  if (!row) {
+    throw new Error(`Demo user not found after seed: ${email}`);
+  }
+
+  return row.id;
+}
+
 async function seedDemoRotation(adminId: string): Promise<void> {
   const { rotationAssignments, rotationHistory, rotationPeriods } = await import(
     "../src/lib/db/schema"
@@ -70,16 +84,23 @@ async function seedDemoRotation(adminId: string): Promise<void> {
   const startDate = todayIso();
   const endDate = defaultPeriodEnd(startDate);
 
+  const [kristinaId, daivaId, jonasId, rasaId] = await Promise.all([
+    resolveUserId("kristina@deisida.lt"),
+    resolveUserId("daiva@deisida.lt"),
+    resolveUserId("jonas@deisida.lt"),
+    resolveUserId("rasa@deisida.lt"),
+  ]);
+
   await createRotationPeriod({
     startDate,
     endDate,
     note: "Demo rotacijos periodas (penktadienio planas)",
     createdById: adminId,
     assignments: [
-      { personId: "cechas-kristina", machineId: "KONV" },
-      { personId: "cechas-daiva", machineId: "KONV" },
-      { personId: "cechas-jonas", machineId: "KNEW" },
-      { personId: "cechas-rasa", machineId: "KNEW" },
+      { personId: kristinaId, machineId: "KONV" },
+      { personId: daivaId, machineId: "KONV" },
+      { personId: jonasId, machineId: "KNEW" },
+      { personId: rasaId, machineId: "KNEW" },
     ],
   });
 }
