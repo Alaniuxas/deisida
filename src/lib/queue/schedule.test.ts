@@ -55,11 +55,11 @@ function plannerMachine(
 }
 
 describe("sortJobsForMachine", () => {
-  it("orders exact width first, then nearest-neighbor, not ascending width", () => {
+  it("orders exact width first, then P3 jobs by deadline", () => {
     const jobs = [
       makeJob("exact", 100),
-      makeJob("far", 10),
-      makeJob("near", 108, "2026-10-20"),
+      makeJob("far", 10, "2026-10-20"),
+      makeJob("near", 108, "2026-10-15"),
     ];
 
     const ordered = sortJobsForMachine(jobs, 100);
@@ -78,7 +78,7 @@ describe("sortJobsForMachine", () => {
     expect(ordered.map((job) => job.id)).toEqual(["p1", "p2"]);
   });
 
-  it("uses deadline as tiebreaker for equal width deltas", () => {
+  it("orders P3 jobs by deadline, not width proximity", () => {
     const jobs = [
       makeJob("later", 110, "2026-10-20"),
       makeJob("sooner", 90, "2026-10-10"),
@@ -87,6 +87,18 @@ describe("sortJobsForMachine", () => {
     const ordered = sortJobsForMachine(jobs, 100);
 
     expect(ordered.map((job) => job.id)).toEqual(["sooner", "later"]);
+  });
+
+  it("does not put far-future P3 ahead of nearer-deadline P3 on the same machine", () => {
+    const jobs = [
+      makeJob("december", 108, "2026-12-31"),
+      makeJob("urgent", 50, "2026-10-08"),
+      makeJob("soon", 90, "2026-10-12"),
+    ];
+
+    const ordered = sortJobsForMachine(jobs, 100);
+
+    expect(ordered.map((job) => job.id)).toEqual(["urgent", "soon", "december"]);
   });
 });
 
@@ -175,13 +187,13 @@ describe("scheduleQueue P1/P2 clustering", () => {
     expect(assignments[0].machineId).toBe("NK1");
   });
 
-  it("orders a lane nearest-neighbor from the conveyor stored width", () => {
+  it("orders a lane P2 width match first, then P3 by deadline", () => {
     const assignments = scheduleQueue(
       [plannerMachine("SK1", 100), plannerMachine("NK1", 200, 720)],
       [
-        makeJob("far", 10, "2026-10-10"),
+        makeJob("far", 10, "2026-10-12"),
         makeJob("exact", 100, "2026-10-11"),
-        makeJob("near", 108, "2026-10-12"),
+        makeJob("near", 108, "2026-10-10"),
       ],
     );
 

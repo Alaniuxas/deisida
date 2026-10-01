@@ -58,7 +58,28 @@ function storisDelta(currentStorisMm: number, jobStorisMm: number): number {
   return Math.abs(currentStorisMm - jobStorisMm);
 }
 
-/** P1 same width+storis, P2 same width, P3 deadline — nearest-neighbor from current setup. */
+type LaneTier = 1 | 2 | 3;
+
+function laneTier(
+  currentWidthMm: number,
+  currentStorisMm: number,
+  jobWidthMm: number,
+  jobStorisMm: number,
+): LaneTier {
+  if (
+    jobWidthMm === currentWidthMm &&
+    jobStorisMm === currentStorisMm &&
+    jobStorisMm > 0
+  ) {
+    return 1;
+  }
+  if (jobWidthMm === currentWidthMm) {
+    return 2;
+  }
+  return 3;
+}
+
+/** P1 same width+storis, P2 same width, P3 deadline — greedy from current setup. */
 export function orderJobsByP1P2P3<T>(
   jobs: T[],
   startWidthMm: number,
@@ -74,35 +95,47 @@ export function orderJobsByP1P2P3<T>(
 
   while (remaining.length > 0) {
     remaining.sort((left, right) => {
-      const leftWidth = getWidth(left);
-      const rightWidth = getWidth(right);
-      const leftExactWidth = leftWidth === currentWidthMm ? 0 : 1;
-      const rightExactWidth = rightWidth === currentWidthMm ? 0 : 1;
-      if (leftExactWidth !== rightExactWidth) {
-        return leftExactWidth - rightExactWidth;
+      const leftTier = laneTier(
+        currentWidthMm,
+        currentStorisMm,
+        getWidth(left),
+        getStoris(left),
+      );
+      const rightTier = laneTier(
+        currentWidthMm,
+        currentStorisMm,
+        getWidth(right),
+        getStoris(right),
+      );
+      if (leftTier !== rightTier) {
+        return leftTier - rightTier;
       }
 
-      const leftWidthDelta = widthDelta(currentWidthMm, leftWidth);
-      const rightWidthDelta = widthDelta(currentWidthMm, rightWidth);
+      if (leftTier === 1) {
+        return compareDeadlines(getDeadline(left), getDeadline(right));
+      }
+
+      if (leftTier === 2) {
+        const leftStorisDelta = storisDelta(currentStorisMm, getStoris(left));
+        const rightStorisDelta = storisDelta(currentStorisMm, getStoris(right));
+        if (leftStorisDelta !== rightStorisDelta) {
+          return leftStorisDelta - rightStorisDelta;
+        }
+        return compareDeadlines(getDeadline(left), getDeadline(right));
+      }
+
+      const deadlineGap = compareDeadlines(getDeadline(left), getDeadline(right));
+      if (deadlineGap !== 0) {
+        return deadlineGap;
+      }
+
+      const leftWidthDelta = widthDelta(currentWidthMm, getWidth(left));
+      const rightWidthDelta = widthDelta(currentWidthMm, getWidth(right));
       if (leftWidthDelta !== rightWidthDelta) {
         return leftWidthDelta - rightWidthDelta;
       }
 
-      const leftStoris = getStoris(left);
-      const rightStoris = getStoris(right);
-      const leftExactStoris = leftStoris === currentStorisMm && currentStorisMm > 0 ? 0 : 1;
-      const rightExactStoris = rightStoris === currentStorisMm && currentStorisMm > 0 ? 0 : 1;
-      if (leftExactStoris !== rightExactStoris) {
-        return leftExactStoris - rightExactStoris;
-      }
-
-      const leftStorisDelta = storisDelta(currentStorisMm, leftStoris);
-      const rightStorisDelta = storisDelta(currentStorisMm, rightStoris);
-      if (leftStorisDelta !== rightStorisDelta) {
-        return leftStorisDelta - rightStorisDelta;
-      }
-
-      return compareDeadlines(getDeadline(left), getDeadline(right));
+      return getWidth(left) - getWidth(right);
     });
 
     const next = remaining.shift();
