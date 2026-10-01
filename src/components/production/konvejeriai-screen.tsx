@@ -14,6 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -253,6 +260,38 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
     }
 
     applyLocalAssignment(machineId, personId);
+
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const nextAssignments = { ...draftAssignments };
+      for (const id of Object.keys(nextAssignments)) {
+        nextAssignments[id] = nextAssignments[id].filter((pid) => pid !== personId);
+      }
+      if (!isAssigned) {
+        nextAssignments[machineId] = [...(nextAssignments[machineId] ?? []), personId];
+      }
+
+      const assignments = Object.entries(nextAssignments).flatMap(
+        ([mid, personIds]) =>
+          personIds.map((pid) => ({ machineId: mid, personId: pid })),
+      );
+      const latest = await saveAssignments({ assignments });
+      applyData(latest);
+      setSaveMessage(isAssigned ? "Darbuotojas atlaisvintas." : "Darbuotojas priskirtas.");
+    } catch (err) {
+      const apiErr = err as ProductionApiError;
+      setSaveError(apiErr.message);
+      const data = await fetchAssignments();
+      applyData(data);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const assignPerson = async (machineId: string, personId: string) => {
+    if (!personId) return;
+    await togglePerson(machineId, personId);
   };
 
   const confirmReassign = async () => {
@@ -518,8 +557,9 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
                 draftAssignments={draftAssignments}
                 personMachineCode={personMachineCode}
                 togglePerson={togglePerson}
+                assignPerson={assignPerson}
                 showEmptyMachines={showEmptyMachines}
-                readOnlyAssignments={false}
+                saving={saving}
               />
 
               {people.length > 0 && unassignedPeople.length > 0 ? (
@@ -674,16 +714,26 @@ function AssignmentGrid({
   draftAssignments,
   personMachineCode,
   togglePerson,
+  assignPerson,
   showEmptyMachines,
+  saving,
 }: {
   displayMachines: Machine[];
   people: Person[];
   draftAssignments: Record<string, string[]>;
   personMachineCode: Map<string, MachineCode>;
   togglePerson: (machineId: string, personId: string) => void;
+  assignPerson: (machineId: string, personId: string) => Promise<void>;
   showEmptyMachines: boolean;
-  readOnlyAssignments: boolean;
+  saving: boolean;
 }) {
+  const [searchByMachine, setSearchByMachine] = useState<Record<string, string>>(
+    {},
+  );
+  const [selectedByMachine, setSelectedByMachine] = useState<
+    Record<string, string>
+  >({});
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {displayMachines.map((machine) => {
@@ -691,6 +741,13 @@ function AssignmentGrid({
         const assignedPeople = people.filter((person) =>
           assignedIds.includes(person.id),
         );
+        const search = (searchByMachine[machine.id] ?? "").trim().toLowerCase();
+        const selectedPersonId = selectedByMachine[machine.id] ?? "";
+        const availablePeople = people.filter((person) => {
+          if (assignedIds.includes(person.id)) return false;
+          if (!search) return true;
+          return person.name.toLowerCase().includes(search);
+        });
 
         return (
           <Card
@@ -718,7 +775,7 @@ function AssignmentGrid({
                         key={person.id}
                         type="button"
                         onClick={() => togglePerson(machine.id, person.id)}
-                        disabled={showEmptyMachines}
+                        disabled={showEmptyMachines || saving}
                         className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-deisida px-4 text-base font-semibold text-deisida-foreground"
                       >
                         <Check className="size-4" />
@@ -739,42 +796,83 @@ function AssignmentGrid({
                   <Users className="size-4" />
                   Priskirti arba perkelti
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {people.length === 0 ? (
-                    <p className="text-base text-muted-foreground">
-                      Darbuotojų sąrašas tuščias
-                    </p>
-                  ) : (
-                    people.map((person) => {
-                      const selected = assignedIds.includes(person.id);
-                      const otherCode = personMachineCode.get(person.id);
-                      if (selected) return null;
-
-                      return (
-                        <button
-                          key={person.id}
-                          type="button"
-                          onClick={() => togglePerson(machine.id, person.id)}
-                          disabled={showEmptyMachines}
-                          className="min-h-12 rounded-xl border border-stone-line bg-paper px-4 text-base font-medium text-foreground hover:bg-muted/80"
+                {people.length === 0 ? (
+                  <p className="text-base text-muted-foreground">
+                    Darbuotojų sąrašas tuščias
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor={`search-${machine.id}`}>Ieškoti pagal vardą</Label>
+                      <Input
+                        id={`search-${machine.id}`}
+                        value={searchByMachine[machine.id] ?? ""}
+                        onChange={(e) =>
+                          setSearchByMachine((prev) => ({
+                            ...prev,
+                            [machine.id]: e.target.value,
+                          }))
+                        }
+                        placeholder="Pvz. Jonas, Rasa…"
+                        className="h-12 text-base"
+                        disabled={showEmptyMachines}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <Label htmlFor={`person-${machine.id}`}>Darbuotojas</Label>
+                        <Select
+                          value={selectedPersonId}
+                          onValueChange={(value) =>
+                            setSelectedByMachine((prev) => ({
+                              ...prev,
+                              [machine.id]: value ?? "",
+                            }))
+                          }
+                          disabled={showEmptyMachines || availablePeople.length === 0}
                         >
-                          {person.name}
-                          {otherCode ? (
-                            <span className="ml-2 text-sm text-muted-foreground">
-                              (dabar{" "}
-                              {otherCode}
-                              )
-                            </span>
-                          ) : (
-                            <span className="ml-2 text-sm text-muted-foreground">
-                              (nepriskirta)
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
+                          <SelectTrigger
+                            id={`person-${machine.id}`}
+                            className="h-12 w-full text-base"
+                          >
+                            <SelectValue placeholder="Pasirinkite darbuotoją" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availablePeople.map((person) => {
+                              const otherCode = personMachineCode.get(person.id);
+                              return (
+                                <SelectItem key={person.id} value={person.id}>
+                                  {person.name}
+                                  {otherCode
+                                    ? ` (dabar ${otherCode})`
+                                    : " (nepriskirta)"}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => assignPerson(machine.id, selectedPersonId)}
+                        disabled={
+                          showEmptyMachines ||
+                          saving ||
+                          !selectedPersonId ||
+                          assignedIds.includes(selectedPersonId)
+                        }
+                        className="h-12 rounded-xl bg-deisida px-6 text-deisida-foreground hover:bg-deisida/90"
+                      >
+                        {saving ? "Saugoma…" : "Priskirti"}
+                      </Button>
+                    </div>
+                    {search && availablePeople.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Pagal „{searchByMachine[machine.id]}“ nieko nerasta.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

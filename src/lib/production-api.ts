@@ -52,6 +52,14 @@ async function request<T>(
     });
 
     if (!response.ok) {
+      const errorBody = await parseJson<{ error?: string }>(response);
+      if (errorBody?.error) {
+        throw new ProductionApiError(
+          errorBody.error,
+          response.status === 404 ? "not_found" : "server",
+          response.status,
+        );
+      }
       throw classifyError(response);
     }
 

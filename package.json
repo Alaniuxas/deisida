@@ -16,6 +16,7 @@
     "db:seed-queue": "tsx scripts/seed-queue-from-archive.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.71",
     "@base-ui/react": "^1.8.0",
     "@react-pdf/renderer": "^4.9.0",
     "ai": "^7.0.126",

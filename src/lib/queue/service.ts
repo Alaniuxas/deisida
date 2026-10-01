@@ -84,10 +84,13 @@ function sanitizeAiComments(
   if (source !== "mock") return comments;
   return comments.filter(
     (comment) =>
+      !comment.includes("ANTHROPIC_API_KEY") &&
       !comment.includes("AI_GATEWAY_API_KEY") &&
       !/gateway neprijungtas|claude neprijungtas/i.test(comment),
   );
 }
+
+function parsePackaging(json: string): PackagingOptions {
   try {
     return { ...defaultPackaging(), ...JSON.parse(json) };
   } catch {
@@ -740,9 +743,7 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
   }));
 
   const assignedByMachine = new Map<string, string[]>();
-  const useRotation =
-    rotations.activePeriod &&
-    Object.keys(rotations.activeAssignments).length > 0;
+  const useRotation = Boolean(rotations.activePeriod);
 
   if (useRotation) {
     for (const [machineId, personIds] of Object.entries(

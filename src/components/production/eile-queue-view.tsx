@@ -140,7 +140,7 @@ export function EileQueueView({
             AI patarimai dar neįjungti. Norėdami įjungti — žr. instrukciją žemiau
             arba kreipkitės į administratorių.
           </p>
-          {isAdmin ? <AiGatewayAdminHelp /> : null}
+          {isAdmin ? <AiAuditAdminHelp /> : null}
           {data.aiComments.length > 0 ? (
             <ul className="mt-3 list-disc space-y-1 pl-5 text-muted-foreground">
               {data.aiComments.map((comment) => (
@@ -225,33 +225,35 @@ export function EileQueueView({
   );
 }
 
-function AiGatewayAdminHelp() {
+function AiAuditAdminHelp() {
   return (
     <details className="mt-3 rounded-lg border border-stone-line bg-muted/40 px-3 py-2">
       <summary className="cursor-pointer font-medium text-ink">
-        Kaip įjungti Vercel AI Gateway (administratoriui)
+        Kaip įjungti Claude AI patarimus (administratoriui)
       </summary>
       <ol className="mt-2 list-decimal space-y-2 pl-5 text-muted-foreground">
         <li>
-          Atidarykite{" "}
+          Gaukite API raktą iš{" "}
           <a
-            href="https://vercel.com/dashboard/ai-gateway"
+            href="https://console.anthropic.com/settings/keys"
             target="_blank"
             rel="noopener noreferrer"
             className="text-deisida underline"
           >
-            Vercel AI Gateway
-          </a>{" "}
-          savo komandos projekte.
+            Anthropic Console
+          </a>
+          .
         </li>
-        <li>Sukurkite arba pasirinkite Gateway raktą projektui „Deisida“.</li>
         <li>
-          Vercel projekto Environment Variables pridėkite{" "}
-          <code className="rounded bg-paper px-1">AI_GATEWAY_API_KEY</code> (Production
-          ir Preview).
+          Vietiniam paleidimui nukopijuokite{" "}
+          <code className="rounded bg-paper px-1">.env.example</code> į{" "}
+          <code className="rounded bg-paper px-1">.env.local</code> ir įrašykite{" "}
+          <code className="rounded bg-paper px-1">ANTHROPIC_API_KEY=sk-ant-…</code>.
         </li>
-        <li>Perdeployinkite projektą arba paleiskite naują preview — API rakto į
-          chatą įklijuoti nereikia.</li>
+        <li>
+          Tikrą raktą niekada nekomituokite į git. Po pakeitimo perkraukite{" "}
+          <code className="rounded bg-paper px-1">npm run dev</code>.
+        </li>
       </ol>
     </details>
   );

@@ -1,3 +1,4 @@
+import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import type { LockedWeek } from "./week";
 
@@ -31,8 +32,7 @@ export interface AuditResult {
   source: "claude" | "mock";
 }
 
-const MODEL = "anthropic/claude-sonnet-4.6";
-const FALLBACK_MODEL = "openai/gpt-5.4";
+const MODEL = anthropic("claude-sonnet-4-20250514");
 
 function heuristicComments(input: AuditInput): string[] {
   const comments: string[] = [];
@@ -58,7 +58,7 @@ function heuristicComments(input: AuditInput): string[] {
 
 export async function auditQueuePlan(input: AuditInput): Promise<AuditResult> {
   const mock = heuristicComments(input);
-  if (!process.env.AI_GATEWAY_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return {
       comments: mock,
       source: "mock",
@@ -87,26 +87,13 @@ Overrides: ${JSON.stringify(input.overrides.slice(0, 20), null, 2)}`;
     }
     return { comments, source: "claude" };
   } catch {
-    try {
-      const { text } = await generateText({
-        model: FALLBACK_MODEL,
-        prompt,
-      });
-      const comments = text
-        .split(/\n+/)
-        .map((line) => line.replace(/^[\s\-*•\d.]+/, "").trim())
-        .filter((line) => line.length > 8)
-        .slice(0, 8);
-      return { comments: comments.length ? comments : mock, source: "claude" };
-    } catch {
-      return {
-        comments: [
-          "AI patarimų generavimas laikinai nepasiekiamas — rodomos automatinės pastabos.",
-          ...mock,
-        ],
-        source: "mock",
-      };
-    }
+    return {
+      comments: [
+        "AI patarimų generavimas laikinai nepasiekiamas — rodomos automatinės pastabos.",
+        ...mock,
+      ],
+      source: "mock",
+    };
   }
 }
 
