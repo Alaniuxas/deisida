@@ -27,6 +27,10 @@ export interface Assignment {
   changeoverHours: number;
   estimatedStart: Date;
   estimatedEnd: Date;
+  pickCriterion: "start" | "width" | "rate";
+  pickStartHours: number;
+  otherMachineId: string | null;
+  otherStartHours: number | null;
 }
 
 export interface ScheduleOptions {

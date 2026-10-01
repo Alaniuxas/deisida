@@ -155,28 +155,51 @@ function machineShopCode(machine: typeof machines.$inferSelect): string {
   return resolveShopCode(machine.code, machine.shopCode);
 }
 
+function formatWaitHours(hours: number): string {
+  if (hours <= 0.05) {
+    return "iš karto";
+  }
+  if (hours < 1) {
+    return `po ${Math.round(hours * 60)} min.`;
+  }
+  const rounded = Math.round(hours * 10) / 10;
+  return `po ${rounded.toLocaleString("lt-LT")} val.`;
+}
+
 function buildAssignmentReason(
   job: QueuedJob,
   machine: (typeof machines.$inferSelect),
-  storedWidthMm: number,
-  requiresChangeover: boolean,
+  assignment: ReturnType<typeof scheduleQueue>[number],
+  machineById: Map<string, typeof machines.$inferSelect>,
 ): string {
-  const conveyorLabel = machine.code;
-  const widthMatches = storedWidthMm > 0 && job.widthMm === storedWidthMm;
+  const thisCode = machine.code;
+  const other = assignment.otherMachineId
+    ? machineById.get(assignment.otherMachineId)
+    : undefined;
+  const otherCode = other?.code ?? assignment.otherMachineId;
+  const thisStart = formatWaitHours(assignment.pickStartHours);
+  const otherStart =
+    assignment.otherStartHours != null
+      ? formatWaitHours(assignment.otherStartHours)
+      : null;
 
-  if (widthMatches) {
-    return `Konvejeris ${conveyorLabel} jau sureguliuotas ${job.widthMm} mm pločiui — visi šio pločio darbai čia.`;
+  if (assignment.pickCriterion === "start" && otherCode && otherStart) {
+    return `Priskirta ${thisCode}, nes ${otherCode} eilė ilgesnė — čia galima pradėti ${thisStart}, ten ${otherStart}.`;
   }
 
-  if (storedWidthMm === 0) {
-    return `Konvejeris ${conveyorLabel} dar nereguliuotas — darbas planuojamas pagal ${job.widthMm} mm plotį ir terminą.`;
+  if (assignment.pickCriterion === "width" && otherCode) {
+    return `Priskirta ${thisCode}: pradžios panašios (skirtumas ≤ 4 val.), arčiau planinio pločio nei ${otherCode} (${job.widthMm} mm).`;
   }
 
-  if (requiresChangeover) {
-    return `Priskirta ${conveyorLabel}: artimiausias dabartiniam pločiui (${storedWidthMm} mm → ${job.widthMm} mm). Po šio darbo reikės reguliuoti (+${DEFAULT_CHANGEOVER_MINUTES} min.).`;
+  if (assignment.pickCriterion === "rate") {
+    return `Priskirta ${thisCode}: pradžia ir plotis panašūs, didesnis našumas (${machine.dailyRate} pal./d.).`;
   }
 
-  return `Priskirta ${conveyorLabel} pagal mažiausią |dabartinis plotis − darbo plotis| (${storedWidthMm} mm → ${job.widthMm} mm), tada ankstesnį laisvumą.`;
+  if (assignment.changeoverHours > 0) {
+    return `Priskirta ${thisCode} pagal ankstesnę pradžią (${thisStart}); reikės reguliuoti į ${job.widthMm} mm (+${DEFAULT_CHANGEOVER_MINUTES} min.).`;
+  }
+
+  return `Priskirta ${thisCode} pagal ankstesnę pradžią (${thisStart}).`;
 }
 
 async function buildSchedule(): Promise<BuiltSchedule | null> {
@@ -331,12 +354,11 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     const workNormPiecesPerDay = workNormByCode.get(machineCode);
 
     const laneJobs: ApiQueueJob[] = ordered.map(({ job, assignment }, index) => {
-      const requiresChangeover = assignment.changeoverHours > 0;
       const assignmentReason = buildAssignmentReason(
         job,
         machine,
-        machine.currentWidthMm ?? 0,
-        requiresChangeover,
+        assignment,
+        built.machineById,
       );
       const schedule = toJobScheduleInfo(
         job,

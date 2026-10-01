@@ -31,10 +31,16 @@ export type {
 
 const HOURS_PER_DAY = 24;
 
+/** Starts within this window compare by |Δ mm| instead of earlier start. */
+export const SIMILAR_START_WINDOW_HOURS = 4;
+
 interface MachineState extends Machine {
   availableAtHours: number;
+  plannedWidthMm: number | null;
   assignedJobs: QueueJob[];
 }
+
+export type PickCriterion = "start" | "width" | "rate";
 
 function toDate(deadline: Date | string): Date {
   return deadline instanceof Date ? deadline : new Date(deadline);
@@ -44,16 +50,39 @@ function compareDeadlines(a: Date | string, b: Date | string): number {
   return toDate(a).getTime() - toDate(b).getTime();
 }
 
+export function storedWidthOrUnknown(storedWidthMm: number): number | null {
+  return storedWidthMm > 0 ? storedWidthMm : null;
+}
+
+export function plannedWidthMatches(
+  plannedWidthMm: number | null | undefined,
+  jobWidthMm: number,
+): boolean {
+  return plannedWidthMm != null && plannedWidthMm > 0 && plannedWidthMm === jobWidthMm;
+}
+
+function changeoverHoursFor(
+  plannedWidthMm: number | null,
+  jobWidthMm: number,
+  changeoverMinutes: number,
+): number {
+  return plannedWidthMatches(plannedWidthMm, jobWidthMm)
+    ? 0
+    : changeoverMinutes / 60;
+}
+
 export function computeJobDurationHours(
   job: Pick<QueueJob, "quantityPallets" | "tileWidthMm">,
   machine: Pick<Machine, "currentWidthMm" | "dailyRatePieces" | "changeoverMinutes">,
+  plannedWidthMm: number | null = storedWidthOrUnknown(machine.currentWidthMm),
 ): { durationHours: number; changeoverHours: number; productionHours: number } {
   const productionHours =
     (job.quantityPallets / machine.dailyRatePieces) * HOURS_PER_DAY;
-  const changeoverHours =
-    job.tileWidthMm === machine.currentWidthMm
-      ? 0
-      : machine.changeoverMinutes / 60;
+  const changeoverHours = changeoverHoursFor(
+    plannedWidthMm,
+    job.tileWidthMm,
+    machine.changeoverMinutes,
+  );
 
   return {
     durationHours: productionHours + changeoverHours,
@@ -74,113 +103,157 @@ export function sortJobsForMachine(
   );
 }
 
-function groupJobsByWidth(jobs: QueueJob[]): Map<number, QueueJob[]> {
-  const grouped = new Map<number, QueueJob[]>();
+function startHoursFor(machine: MachineState, tileWidthMm: number): number {
+  return (
+    machine.availableAtHours +
+    changeoverHoursFor(
+      machine.plannedWidthMm,
+      tileWidthMm,
+      machine.changeoverMinutes,
+    )
+  );
+}
 
-  for (const job of jobs) {
-    const widthJobs = grouped.get(job.tileWidthMm);
-    if (widthJobs) {
-      widthJobs.push(job);
-    } else {
-      grouped.set(job.tileWidthMm, [job]);
+function widthDelta(machine: MachineState, tileWidthMm: number): number {
+  if (machine.plannedWidthMm == null || machine.plannedWidthMm <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return Math.abs(machine.plannedWidthMm - tileWidthMm);
+}
+
+function compareMachineCandidates(
+  left: MachineState,
+  right: MachineState,
+  tileWidthMm: number,
+): { winner: MachineState; criterion: PickCriterion } {
+  const leftStart = startHoursFor(left, tileWidthMm);
+  const rightStart = startHoursFor(right, tileWidthMm);
+  const startGap = Math.abs(leftStart - rightStart);
+
+  if (startGap > SIMILAR_START_WINDOW_HOURS) {
+    if (leftStart !== rightStart) {
+      return {
+        winner: leftStart < rightStart ? left : right,
+        criterion: "start",
+      };
+    }
+  } else {
+    const leftDelta = widthDelta(left, tileWidthMm);
+    const rightDelta = widthDelta(right, tileWidthMm);
+    if (leftDelta !== rightDelta) {
+      return {
+        winner: leftDelta < rightDelta ? left : right,
+        criterion: "width",
+      };
     }
   }
 
-  return grouped;
+  if (left.dailyRatePieces !== right.dailyRatePieces) {
+    return {
+      winner:
+        left.dailyRatePieces > right.dailyRatePieces ? left : right,
+      criterion: "rate",
+    };
+  }
+
+  if (leftStart !== rightStart) {
+    return {
+      winner: leftStart < rightStart ? left : right,
+      criterion: "start",
+    };
+  }
+
+  return { winner: left, criterion: "rate" };
+}
+
+function toMachineState(
+  machine: Machine & { availableAtHours?: number; plannedWidthMm?: number | null },
+): MachineState {
+  return {
+    id: machine.id,
+    currentWidthMm: machine.currentWidthMm,
+    dailyRatePieces: machine.dailyRatePieces,
+    changeoverMinutes: machine.changeoverMinutes,
+    availableAtHours: machine.availableAtHours ?? 0,
+    plannedWidthMm:
+      machine.plannedWidthMm !== undefined
+        ? machine.plannedWidthMm
+        : storedWidthOrUnknown(machine.currentWidthMm),
+    assignedJobs: [],
+  };
 }
 
 export function pickMachine(
-  machineStates: MachineState[],
+  machineStates: Array<
+    Machine & {
+      availableAtHours?: number;
+      plannedWidthMm?: number | null;
+      assignedJobs?: QueueJob[];
+    }
+  >,
   tileWidthMm: number,
 ): MachineState {
-  const widthMatches = machineStates.filter(
-    (machine) => machine.currentWidthMm === tileWidthMm,
-  );
-
-  if (widthMatches.length > 0) {
-    return widthMatches.reduce((best, current) =>
-      current.availableAtHours < best.availableAtHours ? current : best,
-    );
-  }
-
-  return machineStates.reduce((best, current) => {
-    const bestDelta = Math.abs(best.currentWidthMm - tileWidthMm);
-    const currentDelta = Math.abs(current.currentWidthMm - tileWidthMm);
-
-    if (currentDelta !== bestDelta) {
-      return currentDelta < bestDelta ? current : best;
-    }
-
-    return current.availableAtHours < best.availableAtHours ? current : best;
-  });
-}
-
-function earliestDeadline(jobs: QueueJob[]): Date | string {
-  return jobs.reduce(
-    (earliest, job) =>
-      compareDeadlines(job.deadline, earliest) < 0 ? job.deadline : earliest,
-    jobs[0].deadline,
+  const states = machineStates.map(toMachineState);
+  return states.reduce((best, current) =>
+    compareMachineCandidates(best, current, tileWidthMm).winner,
   );
 }
 
-function appendJobsToMachine(machine: MachineState, jobs: QueueJob[]): void {
-  const sorted = [...jobs].sort((left, right) =>
-    compareDeadlines(left.deadline, right.deadline),
+function pickMachineWithReason(
+  machineStates: MachineState[],
+  tileWidthMm: number,
+): {
+  machine: MachineState;
+  criterion: PickCriterion;
+  startHours: number;
+  other: MachineState | null;
+  otherStartHours: number | null;
+} {
+  const machine = machineStates.reduce((best, current) =>
+    compareMachineCandidates(best, current, tileWidthMm).winner,
   );
-  let runningWidthMm =
-    machine.assignedJobs.length > 0
-      ? machine.assignedJobs[machine.assignedJobs.length - 1].tileWidthMm
-      : machine.currentWidthMm;
+  const other =
+    machineStates.find((candidate) => candidate.id !== machine.id) ?? null;
+  const criterion = other
+    ? compareMachineCandidates(machine, other, tileWidthMm).criterion
+    : "rate";
 
-  for (const job of sorted) {
-    const { durationHours } = computeJobDurationHours(job, {
-      currentWidthMm: runningWidthMm,
-      dailyRatePieces: machine.dailyRatePieces,
-      changeoverMinutes: machine.changeoverMinutes,
-    });
-    machine.assignedJobs.push(job);
-    machine.availableAtHours += durationHours;
-    runningWidthMm = job.tileWidthMm;
-  }
+  return {
+    machine,
+    criterion,
+    startHours: startHoursFor(machine, tileWidthMm),
+    other,
+    otherStartHours: other ? startHoursFor(other, tileWidthMm) : null,
+  };
 }
 
 function assignJobsToMachines(
   machines: Machine[],
   jobs: QueueJob[],
-): MachineState[] {
-  const machineStates: MachineState[] = machines.map((machine) => ({
-    ...machine,
-    availableAtHours: 0,
-    assignedJobs: [],
-  }));
-
-  const remainingWidthGroups: [number, QueueJob[]][] = [];
-
-  for (const [width, widthJobs] of groupJobsByWidth(jobs)) {
-    const exactMatches = machineStates.filter(
-      (machine) => machine.currentWidthMm === width,
-    );
-
-    if (exactMatches.length > 0) {
-      const machine = exactMatches.reduce((best, current) =>
-        current.availableAtHours < best.availableAtHours ? current : best,
-      );
-      appendJobsToMachine(machine, widthJobs);
-      continue;
-    }
-
-    remainingWidthGroups.push([width, widthJobs]);
-  }
-
-  remainingWidthGroups.sort(([, leftJobs], [, rightJobs]) =>
-    compareDeadlines(earliestDeadline(leftJobs), earliestDeadline(rightJobs)),
+): { states: MachineState[]; picks: Map<string, ReturnType<typeof pickMachineWithReason>> } {
+  const machineStates: MachineState[] = machines.map((machine) =>
+    toMachineState(machine),
+  );
+  const picks = new Map<string, ReturnType<typeof pickMachineWithReason>>();
+  const orderedJobs = [...jobs].sort((left, right) =>
+    compareDeadlines(left.deadline, right.deadline),
   );
 
-  for (const [width, widthJobs] of remainingWidthGroups) {
-    appendJobsToMachine(pickMachine(machineStates, width), widthJobs);
+  for (const job of orderedJobs) {
+    const pick = pickMachineWithReason(machineStates, job.tileWidthMm);
+    const machine = pick.machine;
+    const { durationHours } = computeJobDurationHours(
+      job,
+      machine,
+      machine.plannedWidthMm,
+    );
+    machine.assignedJobs.push(job);
+    machine.availableAtHours += durationHours;
+    machine.plannedWidthMm = job.tileWidthMm;
+    picks.set(job.id, pick);
   }
 
-  return machineStates;
+  return { states: machineStates, picks };
 }
 
 function addHours(referenceTime: Date, hours: number): Date {
@@ -193,29 +266,24 @@ export function scheduleQueue(
   options: ScheduleOptions = {},
 ): Assignment[] {
   const referenceTime = options.referenceTime ?? new Date();
-  const machineStates = assignJobsToMachines(machines, jobs);
+  const { states: machineStates, picks } = assignJobsToMachines(machines, jobs);
   const assignments: Assignment[] = [];
 
   for (const machine of machineStates) {
     const initialWidthMm = machine.currentWidthMm;
     const orderedJobs = sortJobsForMachine(machine.assignedJobs, initialWidthMm);
-    let runningWidthMm = initialWidthMm;
+    let runningWidthMm = storedWidthOrUnknown(initialWidthMm);
+    let elapsedHours = 0;
 
     for (const job of orderedJobs) {
       const { durationHours, changeoverHours } = computeJobDurationHours(
         job,
-        {
-          currentWidthMm: runningWidthMm,
-          dailyRatePieces: machine.dailyRatePieces,
-          changeoverMinutes: machine.changeoverMinutes,
-        },
+        machine,
+        runningWidthMm,
       );
-
-      const estimatedStart = addHours(referenceTime, machine.availableAtHours);
-      const estimatedEnd = addHours(
-        referenceTime,
-        machine.availableAtHours + durationHours,
-      );
+      const pick = picks.get(job.id);
+      const estimatedStart = addHours(referenceTime, elapsedHours);
+      const estimatedEnd = addHours(referenceTime, elapsedHours + durationHours);
 
       assignments.push({
         jobId: job.id,
@@ -228,9 +296,13 @@ export function scheduleQueue(
         changeoverHours,
         estimatedStart,
         estimatedEnd,
+        pickCriterion: pick?.criterion ?? "start",
+        pickStartHours: pick?.startHours ?? elapsedHours,
+        otherMachineId: pick?.other?.id ?? null,
+        otherStartHours: pick?.otherStartHours ?? null,
       });
 
-      machine.availableAtHours += durationHours;
+      elapsedHours += durationHours;
       runningWidthMm = job.tileWidthMm;
     }
   }

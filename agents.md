@@ -66,7 +66,7 @@ Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query 
 - Cechas naudoja aktyvų rotacijos priskyrimą šiandienai; fallback — `machine_assignments`
 - Proposal form includes **adresas** (object address), persisted on `proposals.address`
 - `/eile`, `/cechas`, `/admin/konvejeriai` load data server-side (no client fetch/HMR dependency behind Cloudflare tunnel)
-- Gamybos eilė: `scheduleQueue` / `pickMachine` naudoja **DB** `machines.current_width_mm` (ne plotį iš eilės). Pirmiausia visi darbai, kurių plotis = konvejerio W, eina į tą konvejerį (globaliai, ne pagal užsakymą). Likę — į konvejerį su mažiausiu `|currentWidth − jobWidth|`, lygios → ankstesnis laisvumas. `splitAcrossMachines` nebėra: tas pats užsakymas gali likti viename konvejeryje, jei arčiau. Konvejeryje: `orderJobsByWidthCorrection` (nearest-neighbor nuo dabartinio pločio).
+- Gamybos eilė (patvirtinta formulė): darbai pagal terminą; kiekvienas → konvejeris su anksčiausia `start = eilės valandos + 0.5 val. jei planinis plotis ≠ darbo plotis`. Planinis plotis pradžioje tik DB `current_width_mm` (0 = nežinomas, visada reguliavimas, kol priskiriamas pirmas darbas). Jei |startKONV − startKNEW| ≤ 4 val. — mažesnis |Δ mm|; kitaip ankstesnė pradžia; tada didesnis pal./d. Tuščias konvejeris laimi prieš ilgą eilę net jei kitas jau tame plotyje. Konvejeryje: nearest-neighbor nuo įrašyto pločio.
 - `/eile`: viršuje lipnūs KONV/KNEW tabai su tikrais pavadinimais; matomas tik pasirinktas konvejeris. Antraštė: „Kitas darbas pagal konvejerį ir plotį.“
 - Admin ir `/eile` naudoja tą patį efektyvų konvejerio plotį (`getEffectiveMachineWidth`: DB → aktyvus darbas → eilėje).
 - Pjūviai (baras): native `<select>` su „Nežinau“.
