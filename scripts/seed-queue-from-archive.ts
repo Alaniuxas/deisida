@@ -6,7 +6,6 @@ import { db, initializeDatabase } from "../src/lib/db";
 import { jobs, proposals, tiles, users } from "../src/lib/db/schema";
 import { confirmProposal, saveProposal } from "../src/lib/db/proposals";
 import { syncQueueMachinesFromArchive } from "../src/lib/queue/archive-machines";
-import { importWorkNorms } from "../src/lib/queue/work-norms";
 import { defaultPackaging } from "../src/lib/types";
 
 const EXTRACT_DIR = path.join(process.cwd(), "data", "archive-import");
@@ -153,7 +152,8 @@ async function confirmExistingOpen(): Promise<number> {
 async function main(): Promise<void> {
   initializeDatabase();
   const machinesSynced = await syncQueueMachinesFromArchive();
-  const normsImported = await importWorkNorms();
+  const { importCuttingNorms } = await import("../src/lib/queue/excel-norms");
+  const cutting = await importCuttingNorms();
   const confirmedOpenJobs = await confirmExistingOpen();
 
   const tileRows = await db
@@ -184,7 +184,7 @@ async function main(): Promise<void> {
           skipped: true,
           reason: `already have ${alreadySampled} archive-queue-sample orders`,
           machines: machinesSynced,
-          normsImported,
+          cutting,
         },
         null,
         2,
@@ -248,7 +248,7 @@ async function main(): Promise<void> {
     JSON.stringify(
       {
         machines: machinesSynced,
-        normsImported,
+        cutting,
         confirmedExistingJobs: confirmedOpenJobs,
         archiveOrdersImported: imported,
         jobsCreated,

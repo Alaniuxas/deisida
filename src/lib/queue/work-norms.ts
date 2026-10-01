@@ -124,6 +124,7 @@ export async function ensureWorkNorms(): Promise<void> {
     .from(workNorms)
     .limit(1);
   if (existing.length === 0) {
-    await importWorkNorms();
+    const { importCuttingNorms } = await import("./excel-norms");
+    await importCuttingNorms();
   }
 }

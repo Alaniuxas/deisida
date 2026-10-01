@@ -44,11 +44,13 @@ import type {
   RotationsAdminData,
 } from "@/lib/production-types";
 
-const MACHINE_ORDER: MachineCode[] = ["KONV", "KNEW"];
+import { SHOP_MACHINE_ORDER } from "@/lib/queue/constants";
 
 function buildDraftState(data: AssignmentsResponse) {
   const sorted = [...data.machines].sort(
-    (a, b) => MACHINE_ORDER.indexOf(a.code) - MACHINE_ORDER.indexOf(b.code),
+    (a, b) =>
+      (SHOP_MACHINE_ORDER as readonly string[]).indexOf(a.code) -
+      (SHOP_MACHINE_ORDER as readonly string[]).indexOf(b.code),
   );
   const assignments: Record<string, string[]> = {};
   const drafts: Record<
@@ -388,11 +390,11 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
   const displayMachines =
     machines.length > 0
       ? machines
-      : MACHINE_ORDER.map((code) => ({
+      : SHOP_MACHINE_ORDER.map((code) => ({
           id: `placeholder-${code}`,
           code,
           shopCode: code,
-          name: code === "KONV" ? "Konvejeris" : "Naujas konvejeris",
+          name: code,
           dailyRatePallets: 0,
           rotationHours: 8,
           currentWidthMm: 0,
@@ -531,7 +533,7 @@ export function KonvejeriaiScreen({ initialData }: KonvejeriaiScreenProps) {
             <TabsContent value="konvejeriai" className="space-y-6">
               <p className="text-sm text-muted-foreground">
                 Eilės planavimui naudojamos <strong>paletės per dieną</strong>{" "}
-                (KONV 240 / KNEW 720 pal./d., kartu su vnt./d. iš darbo normų).
+                (NK1/NK2/S1 vnt./d. iš Excel, pal./d. tik jei nėra paletės stulpelio).
                 Cecho kodų (sk1 ir pan.) logiką nustatysime vėliau.
               </p>
               <MachineSettingsGrid
@@ -618,7 +620,10 @@ function WorkNormsBanner({
         <CardTitle className="text-lg">Darbo normos ir eilės našumas</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-2">
-        {MACHINE_ORDER.map((code) => {
+        {(machines.length > 0
+          ? machines.map((item) => item.code)
+          : [...SHOP_MACHINE_ORDER]
+        ).map((code) => {
           const norm = byCode.get(code);
           const machine = machines.find((item) => item.code === code);
           return (

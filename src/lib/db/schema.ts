@@ -43,6 +43,7 @@ export const machines = sqliteTable("machines", {
   shopCode: text("shop_code"),
   title: text("title").notNull(),
   dailyRate: integer("daily_rate").notNull().default(0),
+  piecesPerDay: integer("pieces_per_day"),
   rotationHours: real("rotation_hours"),
   currentWidthMm: integer("current_width_mm"),
 });
@@ -85,6 +86,7 @@ export const proposalLines = sqliteTable("proposal_lines", {
     .references(() => tiles.id),
   quantity: real("quantity").notNull(),
   quantityUnit: text("quantity_unit", { enum: ["pieces", "pallets"] }).notNull(),
+  storisMm: integer("storis_mm").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -109,6 +111,7 @@ export const jobs = sqliteTable("jobs", {
   deadline: text("deadline").notNull(),
   machineId: text("machine_id").references(() => machines.id),
   widthMm: integer("width_mm").notNull().default(0),
+  storisMm: integer("storis_mm").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
   startedAt: text("started_at"),
   finishedAt: text("finished_at"),
@@ -147,12 +150,69 @@ export const machineAssignments = sqliteTable("machine_assignments", {
 
 export const workNorms = sqliteTable("work_norms", {
   id: text("id").primaryKey(),
-  machineCode: text("machine_code", { enum: ["KONV", "KNEW"] }).notNull(),
+  machineCode: text("machine_code").notNull(),
   label: text("label").notNull(),
   minPiecesPerDay: integer("min_pieces_per_day").notNull(),
   unit: text("unit").notNull().default("pieces"),
   sourceRow: text("source_row"),
   importedAt: text("imported_at").notNull(),
+});
+
+export const cuttingNorms = sqliteTable("cutting_norms", {
+  id: text("id").primaryKey(),
+  machineCode: text("machine_code").notNull(),
+  label: text("label").notNull(),
+  brickKey: text("brick_key"),
+  minPiecesPerDay: integer("min_pieces_per_day").notNull(),
+  unit: text("unit").notNull().default("pieces"),
+  sourceRow: text("source_row"),
+  sheet: text("sheet").notNull().default(""),
+  importedAt: text("imported_at").notNull(),
+});
+
+export const queuePlanRuns = sqliteTable("queue_plan_runs", {
+  id: text("id").primaryKey(),
+  generatedAt: text("generated_at").notNull(),
+  lockedWeekStart: text("locked_week_start").notNull(),
+  lockedWeekEnd: text("locked_week_end").notNull(),
+  aiCommentsJson: text("ai_comments_json").notNull().default("[]"),
+  aiSource: text("ai_source").notNull().default("mock"),
+  status: text("status").notNull().default("ready"),
+});
+
+export const queuePlanItems = sqliteTable("queue_plan_items", {
+  id: text("id").primaryKey(),
+  runId: text("run_id")
+    .notNull()
+    .references(() => queuePlanRuns.id, { onDelete: "cascade" }),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  machineId: text("machine_id")
+    .notNull()
+    .references(() => machines.id),
+  plannedStart: text("planned_start").notNull(),
+  plannedEnd: text("planned_end").notNull(),
+  priority: text("priority").notNull().default("P3"),
+  lockedWeek: integer("locked_week", { mode: "boolean" }).notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  widthMm: integer("width_mm").notNull().default(0),
+  storisMm: integer("storis_mm").notNull().default(0),
+});
+
+export const queueOverrides = sqliteTable("queue_overrides", {
+  id: text("id").primaryKey(),
+  runId: text("run_id").references(() => queuePlanRuns.id, { onDelete: "set null" }),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  fromMachineId: text("from_machine_id").references(() => machines.id),
+  toMachineId: text("to_machine_id").references(() => machines.id),
+  fromStart: text("from_start"),
+  toStart: text("to_start"),
+  reason: text("reason").notNull(),
+  userId: text("user_id").references(() => users.id),
+  createdAt: text("created_at").notNull(),
 });
 
 export const rotationPeriods = sqliteTable("rotation_periods", {
@@ -204,6 +264,10 @@ export type ProposalRow = typeof proposals.$inferSelect;
 export type ProposalLineRow = typeof proposalLines.$inferSelect;
 export type JobRow = typeof jobs.$inferSelect;
 export type WorkNormRow = typeof workNorms.$inferSelect;
+export type CuttingNormRow = typeof cuttingNorms.$inferSelect;
+export type QueuePlanRunRow = typeof queuePlanRuns.$inferSelect;
+export type QueuePlanItemRow = typeof queuePlanItems.$inferSelect;
+export type QueueOverrideRow = typeof queueOverrides.$inferSelect;
 export type RotationPeriodRow = typeof rotationPeriods.$inferSelect;
 export type RotationAssignmentRow = typeof rotationAssignments.$inferSelect;
 export type RotationHistoryRow = typeof rotationHistory.$inferSelect;

@@ -16,7 +16,7 @@ const sessionOptions = {
   },
 };
 
-const publicPaths = ["/prisijungti", "/api/auth/login"];
+const publicPaths = ["/prisijungti", "/api/auth/login", "/api/cron/queue-plan"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

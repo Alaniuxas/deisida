@@ -1,0 +1,969 @@
+{
+  "sourceFile": "2026.06.30_Deisida_normos_FINAL.xlsx",
+  "cuttingSheets": [
+    "PLY1",
+    "PLY2"
+  ],
+  "skippedSheets": [
+    "SVIES",
+    "PLOK",
+    "PLYK",
+    "Kodavimas",
+    "Eur.Val Tikslai"
+  ],
+  "machines": [
+    {
+      "code": "NK1",
+      "title": "NK1 — naujas konvejeris",
+      "shopCode": "NK1",
+      "piecesPerDay": 8000,
+      "dailyRatePallets": 720
+    },
+    {
+      "code": "NK2",
+      "title": "NK2 — naujas konvejeris",
+      "shopCode": "NK2",
+      "piecesPerDay": 1000,
+      "dailyRatePallets": 720
+    },
+    {
+      "code": "S1",
+      "title": "S1 — staklės",
+      "shopCode": "S1",
+      "piecesPerDay": 3500,
+      "dailyRatePallets": 240
+    },
+    {
+      "code": "S2",
+      "title": "S2 — staklės",
+      "shopCode": "S2",
+      "piecesPerDay": 3000,
+      "dailyRatePallets": 240
+    },
+    {
+      "code": "S4",
+      "title": "S4 — staklės",
+      "shopCode": "S4",
+      "piecesPerDay": 2000,
+      "dailyRatePallets": 240
+    },
+    {
+      "code": "SK1",
+      "title": "SK1 — senas konvejeris",
+      "shopCode": "SK1",
+      "piecesPerDay": 2500,
+      "dailyRatePallets": 240
+    }
+  ],
+  "norms": [
+    {
+      "sheet": "PLY1",
+      "sourceRow": 4,
+      "normCode": "PLY1-05-KLN-03",
+      "label": "Klinkerio plytelės ilgų kraštinių klijavimas 45 laipsnių kampu",
+      "machineCode": "S4",
+      "minPiecesPerDay": 215,
+      "minPiecesCalc": 215.3846153846154
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 5,
+      "normCode": "PLY1-01-KLN-04",
+      "label": "Klinkerio plytelės 1 ilgos kraštinės pjovimas 45 laipsnių kampu",
+      "machineCode": "S4",
+      "minPiecesPerDay": 800,
+      "minPiecesCalc": 800.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 7,
+      "normCode": "PLY1-08-KLN-06",
+      "label": "Klinkerio plytelės taisymas po laužymo iš bloko",
+      "machineCode": "S4",
+      "minPiecesPerDay": 1000,
+      "minPiecesCalc": 1000.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 8,
+      "normCode": "PLY1-06-KLN-07",
+      "label": "Klinkerio plytelės laužymas iš bloko",
+      "machineCode": "S4",
+      "minPiecesPerDay": 1000,
+      "minPiecesCalc": 1000.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 9,
+      "normCode": "PLY1-01-AKM-08",
+      "label": "Akmens masės plytelės 50x50 pjovimas be poliravimo",
+      "machineCode": "S4",
+      "minPiecesPerDay": 337,
+      "minPiecesCalc": 335.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 10,
+      "normCode": "PLY1-01-AKM-09",
+      "label": "Akmens masės plytelės 50x50 pjovimas su poliravimu",
+      "machineCode": "S4",
+      "minPiecesPerDay": 294,
+      "minPiecesCalc": 294.7368421052632
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 11,
+      "normCode": "PLY1-01-AKM-10",
+      "label": "Akmens masės plytelės 3cm storio pjovimas kaina už metrą",
+      "machineCode": "S4",
+      "minPiecesPerDay": 25,
+      "minPiecesCalc": 30.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 12,
+      "normCode": "PLY1-01-AKM-11",
+      "label": "Akmens masės plytelės 100x100 pjovimas be poliravimo",
+      "machineCode": "S4",
+      "minPiecesPerDay": 400,
+      "minPiecesCalc": 400.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 13,
+      "normCode": "PLY1-01-AKM-12",
+      "label": "Akmens masės plytelės 100x100 pjovimas su poliravimu",
+      "machineCode": "S4",
+      "minPiecesPerDay": 200,
+      "minPiecesCalc": 200.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 15,
+      "normCode": "PLY1-01-AKM-14",
+      "label": "Akmens masės plytelės pjovimas su poliravimu kaina už metrą",
+      "machineCode": "S4",
+      "minPiecesPerDay": 35,
+      "minPiecesCalc": 35.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 17,
+      "normCode": "PLY1-03-AKM-16",
+      "label": "Akmens masės plytelės 2 cm storis 9 cm skersmens skylės gręžimas",
+      "machineCode": "S4",
+      "minPiecesPerDay": 28,
+      "minPiecesCalc": 28.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 18,
+      "normCode": "PLY1-05-AKM-17",
+      "label": "Akmens masės plytelės 2 cm storis kampų klijavimas",
+      "machineCode": "S4",
+      "minPiecesPerDay": 280,
+      "minPiecesCalc": 280.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 19,
+      "normCode": "PLY1-01-AKM-18",
+      "label": "Akmens masės plytelės 2 cm storis 45 laipsnių pjovimas",
+      "machineCode": "S4",
+      "minPiecesPerDay": 23,
+      "minPiecesCalc": 25.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 20,
+      "normCode": "PLY1-01-AKM-19",
+      "label": "Akmens masės 2 cm storis metro pjūvis",
+      "machineCode": "S4",
+      "minPiecesPerDay": 24,
+      "minPiecesCalc": 25.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 21,
+      "normCode": "PLY1-06-GEN-20",
+      "label": "Plytelės krašto apvalinimas",
+      "machineCode": "S4",
+      "minPiecesPerDay": 24,
+      "minPiecesCalc": 30.0
+    },
+    {
+      "sheet": "PLY1",
+      "sourceRow": 22,
+      "normCode": "PLY1-05-GEN-21",
+      "label": "Kampo klijavimas",
+      "machineCode": "S4",
+      "minPiecesPerDay": 470,
+      "minPiecesCalc": 370.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 2,
+      "normCode": "PLY2-01-ROD-01",
+      "label": "Rodruza plytos pjovimas L kampu",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 3,
+      "normCode": "PLY2-01-ROD-02",
+      "label": "Rodruza plytos pjovimas L kampu vertikalus/horizontalus",
+      "machineCode": "S2",
+      "minPiecesPerDay": 600,
+      "minPiecesCalc": 1030.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 4,
+      "normCode": "PLY2-01-ROD-03",
+      "label": "Rodruza plytos viduriuko pjovimas pusiau",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2333,
+      "minPiecesCalc": 4000.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 5,
+      "normCode": "PLY2-01-ROD-04",
+      "label": "Rodruza plytos kalibracinis viduriuko pjovimas",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 6,
+      "normCode": "PLY2-01-ROD-05",
+      "label": "Rodruza plytos pjovimas plytelėmis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 5000,
+      "minPiecesCalc": 8570.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 7,
+      "normCode": "PLY2-01-ROD-06",
+      "label": "Rodruza plytos pjovimas nuo likučio",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 8,
+      "normCode": "PLY2-01-ROD-07",
+      "label": "Rodruza plytos pjovimas nuo L kampo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 11,
+      "normCode": "PLY2-05-KLN-10",
+      "label": "Klinkerio plytos klijavimas trumpos kraštinės 45 laipsnių kampu",
+      "machineCode": "S4",
+      "minPiecesPerDay": 482,
+      "minPiecesCalc": 825.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 12,
+      "normCode": "PLY2-01-KLN-11",
+      "label": "Klinkerio plytos pjovimas trumpos kraštinės 45 laipsnių kampu",
+      "machineCode": "S4",
+      "minPiecesPerDay": 2000,
+      "minPiecesCalc": 3430.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 13,
+      "normCode": "PLY2-01-ROX-12",
+      "label": "Rox noors wit plytos 40 cm pjovimas pusiau",
+      "machineCode": "S1",
+      "minPiecesPerDay": 760,
+      "minPiecesCalc": 1305.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 14,
+      "normCode": "PLY2-01-ROX-13",
+      "label": "Rox noors wit plytos 40 cm pjovimas L kampu vertikalus/horizontalus",
+      "machineCode": "S1",
+      "minPiecesPerDay": 540,
+      "minPiecesCalc": 925.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 15,
+      "normCode": "PLY2-01-ROX-14",
+      "label": "Rox noors wit plytos 40 cm pjovimas L kampu",
+      "machineCode": "S1",
+      "minPiecesPerDay": 520,
+      "minPiecesCalc": 890.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 16,
+      "normCode": "PLY2-01-ROX-15",
+      "label": "Rox noors wit plytos 40 cm pjovimas plytelėmis",
+      "machineCode": "NK2",
+      "minPiecesPerDay": 1000,
+      "minPiecesCalc": 1715.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 17,
+      "normCode": "PLY2-01-ROX-16",
+      "label": "Rox noors wit plytos 40 cm pjovimas nuo L kampo",
+      "machineCode": "S1",
+      "minPiecesPerDay": 850,
+      "minPiecesCalc": 1455.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 18,
+      "normCode": "PLY2-01-NAT-17",
+      "label": "Naturrot plytos pjovimas L kampu",
+      "machineCode": "S2",
+      "minPiecesPerDay": 600,
+      "minPiecesCalc": 1030.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 19,
+      "normCode": "PLY2-01-NAT-18",
+      "label": "Naturrot plytos pjovimas plytelėmis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 200,
+      "minPiecesCalc": 345.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 20,
+      "normCode": "PLY2-01-SEN-19",
+      "label": "Senovinės plytos pjovimas sijonais",
+      "machineCode": "S1",
+      "minPiecesPerDay": 2700,
+      "minPiecesCalc": 4630.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 21,
+      "normCode": "PLY2-01-SEN-20",
+      "label": "Senovinės plytos pjovimas L kampu vertikalus/horizontalus",
+      "machineCode": "S1",
+      "minPiecesPerDay": 600,
+      "minPiecesCalc": 1030.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 24,
+      "normCode": "PLY2-01-SEN-23",
+      "label": "Senovinės plytos pjovimas plytelėmis 3 pjūvis",
+      "machineCode": "SK1",
+      "minPiecesPerDay": 2500,
+      "minPiecesCalc": 4285.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 25,
+      "normCode": "PLY2-01-SEN-24",
+      "label": "Senovinės plytos kalibracinis pjūvis trumposios dalies",
+      "machineCode": "S1",
+      "minPiecesPerDay": 823,
+      "minPiecesCalc": 1410.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 26,
+      "normCode": "PLY2-01-SAM-25",
+      "label": "Šamotinės plytos pjovimas 45 laispnių kampu",
+      "machineCode": "S4",
+      "minPiecesPerDay": 400,
+      "minPiecesCalc": 685.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 27,
+      "normCode": "PLY2-01-SAM-26",
+      "label": "Šamotinės plytos pjovimas pusiau",
+      "machineCode": "S1",
+      "minPiecesPerDay": 400,
+      "minPiecesCalc": 685.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 28,
+      "normCode": "PLY2-01-KOL-27",
+      "label": "Kolumba plytos 50 cm vidurio kalibracinis pjūvis pusė plytos ilgio",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 1866,
+      "minPiecesCalc": 3200.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 29,
+      "normCode": "PLY2-01-KOL-28",
+      "label": "Kolumba plytos 50 cm vidurio kalibracinis pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 30,
+      "normCode": "PLY2-01-KOL-29",
+      "label": "Kolumba plytos 50 cm pjovimas plytelėmis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 31,
+      "normCode": "PLY2-01-KOL-30",
+      "label": "Kolumba plytos 50 cm pjovimas L kampu pusė plytos ilgio",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 1866,
+      "minPiecesCalc": 3200.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 32,
+      "normCode": "PLY2-01-KOL-31",
+      "label": "Kolumba plytos 50 cm pjovimas nuo L kampo pusė plytos ilgio",
+      "machineCode": "S2",
+      "minPiecesPerDay": 1866,
+      "minPiecesCalc": 3200.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 33,
+      "normCode": "PLY2-01-KOL-32",
+      "label": "Kolumba plytos 50 cm pjovimas L kampu",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 965,
+      "minPiecesCalc": 1655.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 34,
+      "normCode": "PLY2-01-KOL-33",
+      "label": "Kolumba plytos 50 cm pjovimas nuo L kampo likučio 3 pjūvis pusė plytos ilgio",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 1866,
+      "minPiecesCalc": 3200.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 35,
+      "normCode": "PLY2-01-KOL-34",
+      "label": "Kolumba plytos 50 cm pjovimas nuo L kampo likučio 3 pjūvis",
+      "machineCode": "S2",
+      "minPiecesPerDay": 965,
+      "minPiecesCalc": 1655.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 36,
+      "normCode": "PLY2-01-KOL-35",
+      "label": "Kolumba plytos 50 cm pjovimas nuo L kampo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 823,
+      "minPiecesCalc": 1410.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 37,
+      "normCode": "PLY2-01-KOL-36",
+      "label": "Kolumba plytos 50 cm pjovimas nuo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 823,
+      "minPiecesCalc": 1410.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 38,
+      "normCode": "PLY2-01-GEO-37",
+      "label": "Geostylistix plytos 60 cm pjovimas L kampu",
+      "machineCode": "S1",
+      "minPiecesPerDay": 480,
+      "minPiecesCalc": 825.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 39,
+      "normCode": "PLY2-01-GEO-38",
+      "label": "Geostylistix plytos 60 cm pjovimas plytelėmis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 1000,
+      "minPiecesCalc": 1715.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 40,
+      "normCode": "PLY2-01-GEN-39",
+      "label": "Plytos pjovimas 45 laipsnių kampu 50 cm",
+      "machineCode": "S1",
+      "minPiecesPerDay": 500,
+      "minPiecesCalc": 855.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 41,
+      "normCode": "PLY2-01-GEN-40",
+      "label": "Plytos pjovimas 45 laipsnių kampu 40 cm",
+      "machineCode": "S1",
+      "minPiecesPerDay": 500,
+      "minPiecesCalc": 855.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 42,
+      "normCode": "PLY2-01-GEN-41",
+      "label": "Plytos pjovimas 45 laipsnių kampu 30 cm",
+      "machineCode": "S1",
+      "minPiecesPerDay": 500,
+      "minPiecesCalc": 855.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 43,
+      "normCode": "PLY2-01-GEN-42",
+      "label": "Plytos pjovimas 45 laipsnių kampu 20 cm",
+      "machineCode": "S1",
+      "minPiecesPerDay": 500,
+      "minPiecesCalc": 855.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 45,
+      "normCode": "PLY2-01-GEN-44",
+      "label": "Plytos pjovimas plytelėmis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 8000,
+      "minPiecesCalc": 13715.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 50,
+      "normCode": "PLY2-01-GEN-49",
+      "label": "60cm plytos pjovimas plytelėmis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 1794,
+      "minPiecesCalc": 3075.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 51,
+      "normCode": "PLY2-01-GEN-50",
+      "label": "50cm plytos pjovimas plytelėmis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2187,
+      "minPiecesCalc": 3750.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 52,
+      "normCode": "PLY2-01-GEN-51",
+      "label": "40cm plytos pjovimas plytelėmis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2800,
+      "minPiecesCalc": 4800.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 53,
+      "normCode": "PLY2-01-GEN-52",
+      "label": "30cm plytos pjovimas plytelėmis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 5000,
+      "minPiecesCalc": 8570.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 54,
+      "normCode": "PLY2-01-GEN-53",
+      "label": "Plytos pjovimas vertikaliai pagal matmenis",
+      "machineCode": "S1",
+      "minPiecesPerDay": 2500,
+      "minPiecesCalc": 4285.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 55,
+      "normCode": "PLY2-01-GEN-54",
+      "label": "Plytos pjovimas vertikaliai pusiau",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 1000,
+      "minPiecesCalc": 1715.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 56,
+      "normCode": "PLY2-01-GEN-55",
+      "label": "Plytos pjovimas skersai",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 57,
+      "normCode": "PLY2-01-GEN-56",
+      "label": "Plytos kampo klijavimas",
+      "machineCode": "S2",
+      "minPiecesPerDay": 400,
+      "minPiecesCalc": 685.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 59,
+      "normCode": "PLY2-01-GEN-58",
+      "label": "Plytos pjovimas pusiau",
+      "machineCode": "S2",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 60,
+      "normCode": "PLY2-01-GEN-59",
+      "label": "Plytos pjovimas L kampu",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2333,
+      "minPiecesCalc": 4000.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 61,
+      "normCode": "PLY2-01-GEN-60",
+      "label": "60cm plytos pjovimas L kampu",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 1186,
+      "minPiecesCalc": 2035.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 63,
+      "normCode": "PLY2-01-GEN-62",
+      "label": "50cm plytos pjovimas L kampu",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 65,
+      "normCode": "PLY2-01-GEN-64",
+      "label": "40cm plytos pjovimas L kampu",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 67,
+      "normCode": "PLY2-01-GEN-66",
+      "label": "30cm plytos pjovimas L kampu",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3000,
+      "minPiecesCalc": 5145.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 71,
+      "normCode": "PLY2-01-GEN-70",
+      "label": "Plytos įpjova vienas pjūvis PL-8 ruošinys",
+      "machineCode": "SK1",
+      "minPiecesPerDay": 2000,
+      "minPiecesCalc": 3430.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 72,
+      "normCode": "PLY2-01-GEN-71",
+      "label": "Plytos įpjova vienas pjūvis",
+      "machineCode": "SK1",
+      "minPiecesPerDay": 2500,
+      "minPiecesCalc": 4285.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 73,
+      "normCode": "PLY2-01-GEN-72",
+      "label": "Iki 30 cm plytos pjovimas pusiau",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2000,
+      "minPiecesCalc": 3430.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 74,
+      "normCode": "PLY2-01-GEN-73",
+      "label": "Plytos vidurio kalibracinis pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 7000,
+      "minPiecesCalc": 12000.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 75,
+      "normCode": "PLY2-01-GEN-74",
+      "label": "60cm plytos kalibracinis pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 1794,
+      "minPiecesCalc": 3075.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 76,
+      "normCode": "PLY2-01-GEN-75",
+      "label": "50cm plytos kalibracinis pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2187,
+      "minPiecesCalc": 3750.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 77,
+      "normCode": "PLY2-01-GEN-76",
+      "label": "40cm plytos kalibracinis pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2800,
+      "minPiecesCalc": 4800.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 78,
+      "normCode": "PLY2-01-GEN-77",
+      "label": "30cm plytos kalibracinis pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 5000,
+      "minPiecesCalc": 8570.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 79,
+      "normCode": "PLY2-01-GEN-78",
+      "label": "Plytos vidurio kalibracinis pjūvis po L kampo pjovimo",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 8750,
+      "minPiecesCalc": 15000.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 80,
+      "normCode": "PLY2-01-GEN-79",
+      "label": "60cm plytos vidurio kalibracinis pjūvis po L kampo pjovimo",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2000,
+      "minPiecesCalc": 3430.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 81,
+      "normCode": "PLY2-01-GEN-80",
+      "label": "50cm plytos vidurio kalibracinis pjūvis po L kampo pjovimo",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2692,
+      "minPiecesCalc": 4615.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 82,
+      "normCode": "PLY2-01-GEN-81",
+      "label": "40cm plytos vidurio kalibracinis pjūvis po L kampo pjovimo",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3500,
+      "minPiecesCalc": 6000.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 83,
+      "normCode": "PLY2-01-GEN-82",
+      "label": "30cm plytos vidurio kalibracinis pjūvis po L kampo pjovimo",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 6363,
+      "minPiecesCalc": 10910.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 84,
+      "normCode": "PLY2-01-GEN-83",
+      "label": "Plytos vidurio pjovimas pusiau į dvi lygias dalis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2800,
+      "minPiecesCalc": 4800.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 85,
+      "normCode": "PLY2-01-GEN-84",
+      "label": "Plytos vidurio pjovimas pusiau",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2800,
+      "minPiecesCalc": 4800.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 86,
+      "normCode": "PLY2-01-GEN-85",
+      "label": "Plytos figūrinis pjovimas į trikampį iš pusės plytos 100x72x50, snapelis 11mm pločio",
+      "machineCode": "S1",
+      "minPiecesPerDay": 2240,
+      "minPiecesCalc": 3840.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 87,
+      "normCode": "PLY2-01-GEN-86",
+      "label": "60cm plytos pjovimas nuo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 1794,
+      "minPiecesCalc": 3075.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 88,
+      "normCode": "PLY2-01-GEN-87",
+      "label": "50cm plytos pjovimas nuo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2187,
+      "minPiecesCalc": 3750.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 89,
+      "normCode": "PLY2-01-GEN-88",
+      "label": "40cm plytos pjovimas nuo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2800,
+      "minPiecesCalc": 4800.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 90,
+      "normCode": "PLY2-01-GEN-89",
+      "label": "30cm plytos pjovimas nuo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 5000,
+      "minPiecesCalc": 8570.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 91,
+      "normCode": "PLY2-01-GEN-90",
+      "label": "60 cm plytos pjovimas nuo L kampo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2000,
+      "minPiecesCalc": 3430.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 92,
+      "normCode": "PLY2-01-GEN-91",
+      "label": "60 cm plytos pjovimas nuo L kampo",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2000,
+      "minPiecesCalc": 3430.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 93,
+      "normCode": "PLY2-01-GEN-92",
+      "label": "50 cm plytos pjovimas nuo L kampo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2692,
+      "minPiecesCalc": 4615.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 94,
+      "normCode": "PLY2-01-GEN-93",
+      "label": "50 cm plytos pjovimas nuo L kampo",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 2692,
+      "minPiecesCalc": 4615.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 95,
+      "normCode": "PLY2-01-GEN-94",
+      "label": "40 cm plytos pjovimas nuo L kampo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3500,
+      "minPiecesCalc": 6000.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 96,
+      "normCode": "PLY2-01-GEN-95",
+      "label": "40 cm plytos pjovimas nuo L kampo",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 3500,
+      "minPiecesCalc": 6000.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 97,
+      "normCode": "PLY2-01-GEN-96",
+      "label": "30 cm plytos pjovimas nuo L kampo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 8750,
+      "minPiecesCalc": 15000.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 98,
+      "normCode": "PLY2-01-GEN-97",
+      "label": "30 cm plytos pjovimas nuo L kampo",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 6363,
+      "minPiecesCalc": 10910.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 99,
+      "normCode": "PLY2-01-GEN-98",
+      "label": "Plytos pjovimas nuo L kampo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 4000,
+      "minPiecesCalc": 6855.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 102,
+      "normCode": "PLY2-01-GEN-101",
+      "label": "Plytos pjovimas nuo L kampo",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 4000,
+      "minPiecesCalc": 6855.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 103,
+      "normCode": "PLY2-01-GEN-102",
+      "label": "Plytos pjovimas nuo likučio 3 pjūvis",
+      "machineCode": "NK1",
+      "minPiecesPerDay": 7000,
+      "minPiecesCalc": 12000.0
+    },
+    {
+      "sheet": "PLY2",
+      "sourceRow": 104,
+      "normCode": "PLY2-01-GEN-103",
+      "label": "Plytos pjovimas papildomas dalinant ilgį pusiau",
+      "machineCode": "S1",
+      "minPiecesPerDay": 3500,
+      "minPiecesCalc": 6000.0
+    }
+  ]
+}

@@ -14,6 +14,8 @@ import {
   conveyorDisplayLabel,
   formatPalletRateWithNorm,
 } from "@/lib/queue/rate-labels";
+import { SHOP_MACHINE_ORDER } from "@/lib/queue/constants";
+import { formatLockedWeekLabel } from "@/lib/queue/week";
 import { cn } from "@/lib/utils";
 import type { QueueLane, QueueResponse } from "@/lib/production-types";
 
@@ -23,9 +25,8 @@ interface EileQueueViewProps {
   selectedCode?: string;
   confirmed?: string;
   jobsCreated?: string;
+  canEdit?: boolean;
 }
-
-const LANE_ORDER = ["KONV", "KNEW"];
 
 function quantityText(
   count: number,
@@ -37,10 +38,18 @@ function quantityText(
   return count === 1 ? "1 vnt." : `${count} vnt.`;
 }
 
+function laneKey(lane: QueueLane): string {
+  return lane.shopCode || lane.code;
+}
+
 function sortLanes(lanes: QueueLane[]): QueueLane[] {
   return [...lanes].sort((left, right) => {
-    const leftIndex = LANE_ORDER.indexOf(left.code);
-    const rightIndex = LANE_ORDER.indexOf(right.code);
+    const leftIndex = (SHOP_MACHINE_ORDER as readonly string[]).indexOf(
+      laneKey(left),
+    );
+    const rightIndex = (SHOP_MACHINE_ORDER as readonly string[]).indexOf(
+      laneKey(right),
+    );
     return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);
   });
 }
@@ -48,9 +57,9 @@ function sortLanes(lanes: QueueLane[]): QueueLane[] {
 function defaultLaneCode(lanes: QueueLane[]): string {
   const withJobs = lanes.find((lane) => lane.jobs.length > 0);
   if (withJobs) {
-    return withJobs.code;
+    return laneKey(withJobs);
   }
-  return lanes.find((lane) => lane.code === "KONV")?.code ?? lanes[0]?.code ?? "KONV";
+  return lanes[0] ? laneKey(lanes[0]) : "NK1";
 }
 
 function laneHref(
@@ -70,20 +79,30 @@ export function EileQueueView({
   selectedCode,
   confirmed,
   jobsCreated,
+  canEdit = false,
 }: EileQueueViewProps) {
   const lanes = sortLanes(data.lanes);
   const totalJobs = lanes.reduce((sum, lane) => sum + lane.jobs.length, 0);
   const requested = selectedCode?.trim().toUpperCase();
-  const activeCode = lanes.some((lane) => lane.code === requested)
-    ? requested
+  const activeCode = lanes.some((lane) => laneKey(lane) === requested || lane.code === requested)
+    ? (lanes.find((lane) => laneKey(lane) === requested || lane.code === requested)
+        ? laneKey(
+            lanes.find((lane) => laneKey(lane) === requested || lane.code === requested)!,
+          )
+        : defaultLaneCode(lanes))
     : defaultLaneCode(lanes);
   const selectedLane =
-    lanes.find((lane) => lane.code === activeCode) ?? lanes[0] ?? null;
+    lanes.find((lane) => laneKey(lane) === activeCode || lane.code === activeCode) ??
+    lanes[0] ??
+    null;
+  const laterCount =
+    data.laterLockedCount +
+    lanes.reduce((sum, lane) => sum + (lane.laterJobCount ?? 0), 0) / 2;
 
   return (
     <PageShell
       title="Gamybinė eilė"
-      subtitle="Kitas darbas pagal konvejerį ir plotį."
+      subtitle="Kitas darbas pagal stakles, plotį ir pjovimo storį (P1/P2/P3)."
       wide
     >
       {notice ? (
@@ -91,20 +110,59 @@ export function EileQueueView({
           {notice}
         </p>
       ) : null}
+
+      {data.lockedWeekStart && data.lockedWeekEnd ? (
+        <p className="rounded-xl border border-stone-line bg-muted/40 px-4 py-3 text-sm text-ink">
+          Rodoma tik užrakinta savaitė{" "}
+          <strong>
+            {formatLockedWeekLabel({
+              startIso: data.lockedWeekStart,
+              endIso: data.lockedWeekEnd,
+            })}
+          </strong>
+          . Toliau — po kito penktadienio 00:00 (Vilnius).
+          {laterCount > 0
+            ? ` Už horizonto: ${data.laterLockedCount} darb.`
+            : ""}
+        </p>
+      ) : (
+        <p className="rounded-xl border border-dashed border-stone-line px-4 py-3 text-sm text-muted-foreground">
+          Savaitės planas dar nesugeneruotas. Paleiskite{" "}
+          <code>npm run queue:plan</code> (penktadienį 00:00 vis tiek perskaičiuos).
+        </p>
+      )}
+
+      {data.aiComments.length > 0 ? (
+        <div className="rounded-xl border border-stone-line bg-paper px-4 py-3 text-sm">
+          <p className="mb-2 font-medium text-ink">
+            AI pastabos
+            {data.aiSource === "mock" ? " (mock — Gateway neprijungtas)" : " (Claude)"}
+          </p>
+          <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+            {data.aiComments.map((comment) => (
+              <li key={comment}>{comment}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {totalJobs === 0 ? (
         <EmptyState
-          title="Eilėje darbų nėra"
-          description="Patvirtinti pasiūlymai dar neperkelti į gamybą."
+          title="Šią savaitę darbų nėra"
+          description="Patvirtinti pasiūlymai dar neperkelti į gamybą, arba jie už užrakintos savaitės."
         />
       ) : (
         <div className="space-y-6">
           <nav
-            aria-label="Konvejeriai"
+            aria-label="Staklės"
             className="sticky top-0 z-30 isolate -mx-4 border-b border-stone-line bg-background px-4 py-3 sm:-mx-6 sm:px-6"
           >
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {lanes.map((lane) => {
-                const active = lane.code === selectedLane?.code;
+                const key = laneKey(lane);
+                const active = key === laneKey(selectedLane ?? lane) && lane.id === selectedLane?.id
+                  ? true
+                  : key === activeCode || lane.code === activeCode;
                 const rate = formatPalletRateWithNorm(
                   lane.dailyRatePallets,
                   lane.workNormPiecesPerDay,
@@ -116,8 +174,8 @@ export function EileQueueView({
 
                 return (
                   <Link
-                    key={lane.code}
-                    href={laneHref(lane.code, { confirmed, jobsCreated })}
+                    key={lane.id || key}
+                    href={laneHref(key, { confirmed, jobsCreated })}
                     scroll={false}
                     prefetch
                     aria-current={active ? "page" : undefined}
@@ -129,10 +187,10 @@ export function EileQueueView({
                     )}
                   >
                     <span className="block text-base font-semibold leading-snug">
-                      {lane.name?.trim() || lane.code}
+                      {key}
                     </span>
                     <span className="mt-1 block text-sm opacity-90">
-                      {lane.code} · {widthText}
+                      {widthText} · {lane.jobs.length} darb.
                     </span>
                     <span className="mt-1 block text-sm opacity-90">{rate}</span>
                   </Link>
@@ -140,15 +198,30 @@ export function EileQueueView({
               })}
             </div>
           </nav>
-          {selectedLane ? <LaneSection lane={selectedLane} /> : null}
+          {selectedLane ? (
+            <LaneSection
+              lane={selectedLane}
+              lanes={lanes}
+              canEdit={canEdit}
+            />
+          ) : null}
         </div>
       )}
     </PageShell>
   );
 }
 
-function LaneSection({ lane }: { lane: QueueLane }) {
-  const laneLabel = conveyorDisplayLabel(lane.code, lane.name);
+function LaneSection({
+  lane,
+  lanes,
+  canEdit,
+}: {
+  lane: QueueLane;
+  lanes: QueueLane[];
+  canEdit: boolean;
+}) {
+  const shop = lane.shopCode || lane.code;
+  const laneLabel = conveyorDisplayLabel(shop, lane.name);
   const laneRate = formatPalletRateWithNorm(
     lane.dailyRatePallets,
     lane.workNormPiecesPerDay,
@@ -175,9 +248,15 @@ function LaneSection({ lane }: { lane: QueueLane }) {
         ) : null}
       </div>
 
+      {lane.laterJobCount > 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Dar {lane.laterJobCount} darb. užrakinta — matoma po kito penktadienio.
+        </p>
+      ) : null}
+
       {lane.jobs.length === 0 ? (
         <p className="rounded-xl border border-dashed border-stone-line px-4 py-6 text-base text-muted-foreground">
-          Šiame konvejeryje šiuo metu darbų nėra.
+          Šiose staklėse šią savaitę darbų nėra.
         </p>
       ) : (
         <div className="grid gap-4">
@@ -190,14 +269,15 @@ function LaneSection({ lane }: { lane: QueueLane }) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-muted-foreground">
-                      #{job.schedule?.positionInQueue ?? "—"} eilėje · {lane.code}
+                      #{job.schedule?.positionInQueue ?? "—"} eilėje · {shop}
+                      {job.schedule?.priority ? ` · ${job.schedule.priority}` : ""}
                     </p>
                     <CardTitle className="text-lg font-semibold leading-snug">
                       {job.tileName}
                     </CardTitle>
                   </div>
                   <Badge className="bg-deisida text-deisida-foreground">
-                    {lane.code}
+                    {shop}
                   </Badge>
                 </div>
                 <p className="text-base text-muted-foreground">
@@ -239,7 +319,7 @@ function LaneSection({ lane }: { lane: QueueLane }) {
                   <div className="rounded-xl border border-stone-line bg-muted/30 p-4">
                     <div className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                       <Cog className="size-4" />
-                      Gamybos planas ({lane.code})
+                      Gamybos planas ({shop})
                     </div>
                     <dl className="grid gap-2 text-sm sm:grid-cols-2">
                       <PlanRow
@@ -278,6 +358,45 @@ function LaneSection({ lane }: { lane: QueueLane }) {
                         value={formatScheduleTimestamp(job.schedule.estimatedEnd)}
                       />
                     </dl>
+                    {canEdit && job.schedule.editable ? (
+                      <form
+                        method="post"
+                        action="/api/jobs/queue/override"
+                        className="mt-4 space-y-2 border-t border-stone-line pt-3"
+                      >
+                        <input type="hidden" name="jobId" value={job.id} />
+                        <label className="block text-sm text-muted-foreground">
+                          Perkelti šią savaitę
+                          <select
+                            name="machineId"
+                            className="mt-1 h-10 w-full rounded-md border border-stone-line bg-paper px-2 text-sm"
+                            defaultValue={lane.id}
+                          >
+                            {lanes.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.shopCode || option.code}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <input
+                          name="reason"
+                          required
+                          placeholder="Priežastis"
+                          className="h-10 w-full rounded-md border border-stone-line bg-paper px-3 text-sm"
+                        />
+                        <button
+                          type="submit"
+                          className="h-10 rounded-md bg-deisida px-4 text-sm font-medium text-deisida-foreground"
+                        >
+                          Išsaugoti perkėlimą
+                        </button>
+                      </form>
+                    ) : !job.schedule.editable && canEdit ? (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        Šio darbo keisti negalima — ne užrakintoje savaitėje.
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
               </CardContent>

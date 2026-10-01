@@ -33,6 +33,7 @@ export interface TileLine {
   tileId: string;
   quantity: number;
   quantityUnit: QuantityUnit;
+  storisMm?: number;
 }
 
 export interface Proposal {

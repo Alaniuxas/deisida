@@ -10,7 +10,7 @@ import {
 } from "@/lib/db/schema";
 import type { PackagingOptions, Proposal, QuantityUnit, TileLine } from "@/lib/types";
 import { defaultPackaging } from "@/lib/types";
-import { getLinePieceCount } from "@/lib/proposal-utils";
+import { getLinePieceCount, resolveLineStorisMm } from "@/lib/proposal-utils";
 import { tileRowToTile } from "@/lib/db/tiles";
 
 export interface ProposalWithLines extends ProposalRow {
@@ -44,6 +44,7 @@ export function proposalToForm(
       tileId: line.tileId,
       quantity: line.quantity,
       quantityUnit: line.quantityUnit as QuantityUnit,
+      storisMm: line.storisMm > 0 ? line.storisMm : undefined,
     })),
     extraClauses: [],
   };
@@ -143,6 +144,7 @@ export async function saveProposal(
       tileId: line.tileId,
       quantity: line.quantity,
       quantityUnit: line.quantityUnit,
+      storisMm: line.storisMm ?? 0,
       sortOrder: index,
     });
   }
@@ -194,11 +196,13 @@ export async function confirmProposal(proposalId: string): Promise<number> {
       tileId: line.tileId,
       quantity: line.quantity,
       quantityUnit: line.quantityUnit as QuantityUnit,
+      storisMm: line.storisMm,
     };
 
     const pieceCount = tile
       ? getLinePieceCountWithTile(tileLine, tile)
       : Math.round(line.quantity);
+    const storisMm = resolveLineStorisMm(tileLine, tile);
 
     await db.insert(jobs).values({
       id: crypto.randomUUID(),
@@ -213,6 +217,7 @@ export async function confirmProposal(proposalId: string): Promise<number> {
       deadline: proposal.serviceDeadline,
       machineId: null,
       widthMm: tile?.widthMm ?? 0,
+      storisMm,
       sortOrder: index,
       startedAt: null,
       finishedAt: null,

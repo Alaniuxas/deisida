@@ -167,8 +167,24 @@ export function getLineSubtotal(line: TileLine): number {
   return roundToCents(line.quantity * piecesPerPallet * unitPrice);
 }
 
+export function resolveLineStorisMm(
+  line: TileLine,
+  tile?: { defaultStorisMm?: number; heightMm?: number } | null,
+): number {
+  if (line.storisMm != null && line.storisMm > 0) {
+    return line.storisMm;
+  }
+  if (tile?.defaultStorisMm && tile.defaultStorisMm > 0) {
+    return tile.defaultStorisMm;
+  }
+  if (tile?.heightMm && tile.heightMm > 0) {
+    return tile.heightMm;
+  }
+  return getTileById(line.tileId)?.defaultStorisMm || getTileById(line.tileId)?.heightMm || 0;
+}
+
 export function getLineStorisMm(line: TileLine): number {
-  return getTileById(line.tileId)?.heightMm ?? 0;
+  return resolveLineStorisMm(line, getTileById(line.tileId));
 }
 
 export function formatLineStoris(line: TileLine): string {

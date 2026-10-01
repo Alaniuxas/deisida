@@ -12,6 +12,8 @@ export default async function EilePage({
     confirmed?: string;
     jobs?: string;
     konvejeris?: string;
+    moved?: string;
+    error?: string;
   }>;
 }) {
   const user = await getCurrentUser();
@@ -27,7 +29,11 @@ export default async function EilePage({
       ? `Patvirtinta ${params.confirmed}: sukurta ${params.jobs} gamybos darbai.`
       : params.confirmed
         ? `Patvirtinta ${params.confirmed}.`
-        : null;
+        : params.moved
+          ? "Perkėlimas išsaugotas (override)."
+          : params.error
+            ? params.error
+            : null;
 
   return (
     <EileQueueView
@@ -36,6 +42,7 @@ export default async function EilePage({
       selectedCode={params.konvejeris}
       confirmed={params.confirmed}
       jobsCreated={params.jobs}
+      canEdit={["admin", "pardavimai"].includes(user.role)}
     />
   );
 }

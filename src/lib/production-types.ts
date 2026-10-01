@@ -1,4 +1,6 @@
-export type MachineCode = "KONV" | "KNEW";
+export type MachineCode = string;
+
+export type ClusterPriority = "P1" | "P2" | "P3";
 
 export type MachineWidthSource = "stored" | "in_progress" | "queued" | "unset";
 
@@ -27,6 +29,7 @@ export interface JobPackaging {
 
 export interface JobScheduleInfo {
   widthMm: number;
+  storisMm: number;
   deadline: string;
   conveyorCode: MachineCode;
   conveyorShopCode: string;
@@ -45,6 +48,8 @@ export interface JobScheduleInfo {
   positionInQueue: number;
   requiresChangeover: boolean;
   assignmentReason: string;
+  priority?: ClusterPriority;
+  editable?: boolean;
 }
 
 export interface ShopJob {
@@ -101,6 +106,7 @@ export interface QueueWidthGroup {
 }
 
 export interface QueueLane {
+  id: string;
   code: MachineCode;
   shopCode: string;
   name: string;
@@ -112,11 +118,18 @@ export interface QueueLane {
   rotationHours: number;
   changeoverMinutes: number;
   jobs: QueueJob[];
+  laterJobCount: number;
 }
 
 export interface QueueResponse {
   lanes: QueueLane[];
   groups: QueueWidthGroup[];
+  lockedWeekStart: string | null;
+  lockedWeekEnd: string | null;
+  laterLockedCount: number;
+  aiComments: string[];
+  aiSource: "claude" | "mock" | null;
+  planRunId: string | null;
 }
 
 export interface Person {

@@ -1,16 +1,23 @@
 export type CutType = string;
 
+export type PickCriterion = "p1" | "p2" | "far" | "width" | "rate";
+
+export type ClusterPriority = "P1" | "P2" | "P3";
+
 export interface Machine {
   id: string;
   currentWidthMm: number;
   dailyRatePieces: number;
   changeoverMinutes: number;
+  piecesPerDay?: number;
 }
 
 export interface QueueJob {
   id: string;
   tileWidthMm: number;
+  storisMm: number;
   quantityPallets: number;
+  pieceCount: number;
   deadline: Date | string;
   cutType: CutType;
   proposalId: string;
@@ -22,15 +29,17 @@ export interface Assignment {
   proposalId: string;
   cutType: CutType;
   tileWidthMm: number;
+  storisMm: number;
   quantityPallets: number;
   durationHours: number;
   changeoverHours: number;
   estimatedStart: Date;
   estimatedEnd: Date;
-  pickCriterion: "start" | "width" | "rate";
+  pickCriterion: PickCriterion;
   pickStartHours: number;
   otherMachineId: string | null;
   otherStartHours: number | null;
+  priority: ClusterPriority;
 }
 
 export interface ScheduleOptions {
@@ -40,4 +49,5 @@ export interface ScheduleOptions {
 export interface MachineDefaults {
   dailyRatePieces: number;
   changeoverMinutes: number;
+  piecesPerDay?: number;
 }

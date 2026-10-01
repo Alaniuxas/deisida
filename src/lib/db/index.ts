@@ -68,6 +68,7 @@ export function initializeDatabase(): void {
       shop_code TEXT,
       title TEXT NOT NULL,
       daily_rate INTEGER NOT NULL DEFAULT 0,
+      pieces_per_day INTEGER,
       rotation_hours REAL,
       current_width_mm INTEGER
     );
@@ -99,6 +100,7 @@ export function initializeDatabase(): void {
       tile_id TEXT NOT NULL REFERENCES tiles(id),
       quantity REAL NOT NULL,
       quantity_unit TEXT NOT NULL,
+      storis_mm INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS jobs (
@@ -114,6 +116,7 @@ export function initializeDatabase(): void {
       deadline TEXT NOT NULL,
       machine_id TEXT REFERENCES machines(id),
       width_mm INTEGER NOT NULL DEFAULT 0,
+      storis_mm INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0,
       started_at TEXT,
       finished_at TEXT
@@ -174,6 +177,51 @@ export function initializeDatabase(): void {
       reason TEXT,
       action TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS cutting_norms (
+      id TEXT PRIMARY KEY,
+      machine_code TEXT NOT NULL,
+      label TEXT NOT NULL,
+      brick_key TEXT,
+      min_pieces_per_day INTEGER NOT NULL,
+      unit TEXT NOT NULL DEFAULT 'pieces',
+      source_row TEXT,
+      sheet TEXT NOT NULL DEFAULT '',
+      imported_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS queue_plan_runs (
+      id TEXT PRIMARY KEY,
+      generated_at TEXT NOT NULL,
+      locked_week_start TEXT NOT NULL,
+      locked_week_end TEXT NOT NULL,
+      ai_comments_json TEXT NOT NULL DEFAULT '[]',
+      ai_source TEXT NOT NULL DEFAULT 'mock',
+      status TEXT NOT NULL DEFAULT 'ready'
+    );
+    CREATE TABLE IF NOT EXISTS queue_plan_items (
+      id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL REFERENCES queue_plan_runs(id) ON DELETE CASCADE,
+      job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      machine_id TEXT NOT NULL REFERENCES machines(id),
+      planned_start TEXT NOT NULL,
+      planned_end TEXT NOT NULL,
+      priority TEXT NOT NULL DEFAULT 'P3',
+      locked_week INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      width_mm INTEGER NOT NULL DEFAULT 0,
+      storis_mm INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS queue_overrides (
+      id TEXT PRIMARY KEY,
+      run_id TEXT REFERENCES queue_plan_runs(id) ON DELETE SET NULL,
+      job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      from_machine_id TEXT REFERENCES machines(id),
+      to_machine_id TEXT REFERENCES machines(id),
+      from_start TEXT,
+      to_start TEXT,
+      reason TEXT NOT NULL,
+      user_id TEXT REFERENCES users(id),
+      created_at TEXT NOT NULL
+    );
   `);
 
   const proposalColumns = sqlite
@@ -189,9 +237,54 @@ export function initializeDatabase(): void {
   if (!machineColumns.some((column) => column.name === "shop_code")) {
     sqlite.exec(`ALTER TABLE machines ADD COLUMN shop_code TEXT`);
   }
+  if (!machineColumns.some((column) => column.name === "pieces_per_day")) {
+    sqlite.exec(`ALTER TABLE machines ADD COLUMN pieces_per_day INTEGER`);
+  }
+
+  const jobColumns = sqlite
+    .prepare("PRAGMA table_info(jobs)")
+    .all() as { name: string }[];
+  if (!jobColumns.some((column) => column.name === "storis_mm")) {
+    sqlite.exec(`ALTER TABLE jobs ADD COLUMN storis_mm INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  const lineColumns = sqlite
+    .prepare("PRAGMA table_info(proposal_lines)")
+    .all() as { name: string }[];
+  if (!lineColumns.some((column) => column.name === "storis_mm")) {
+    sqlite.exec(
+      `ALTER TABLE proposal_lines ADD COLUMN storis_mm INTEGER NOT NULL DEFAULT 0`,
+    );
+  }
 
   sqlite.exec(`
-    UPDATE machines SET shop_code = NULL WHERE shop_code IN ('sk1', 'sk2');
+    UPDATE jobs
+    SET storis_mm = COALESCE(
+      (
+        SELECT CASE
+          WHEN tiles.default_storis_mm > 0 THEN tiles.default_storis_mm
+          ELSE tiles.height_mm
+        END
+        FROM tiles
+        WHERE tiles.id = jobs.tile_id
+      ),
+      0
+    )
+    WHERE storis_mm = 0;
+
+    UPDATE proposal_lines
+    SET storis_mm = COALESCE(
+      (
+        SELECT CASE
+          WHEN tiles.default_storis_mm > 0 THEN tiles.default_storis_mm
+          ELSE tiles.height_mm
+        END
+        FROM tiles
+        WHERE tiles.id = proposal_lines.tile_id
+      ),
+      0
+    )
+    WHERE storis_mm = 0;
   `);
 }
 

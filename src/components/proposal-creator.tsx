@@ -14,7 +14,6 @@ import {
   createEmptyTileLine,
   ensureProposalLineCount,
   formatCatalogPrice,
-  formatLineStoris,
   getLineCatalogPrice,
   quantityUnitLabel,
   validateProposal,
@@ -244,12 +243,26 @@ function TileLineEditor({
           />
         </FormField>
 
-        <FormField label={tile ? `Pjovimo storis · ${tile.heightMm} mm` : "Pjovimo storis"}>
-          <div
-            className={`flex ${controlClass} items-center rounded-md border border-stone-line bg-[#f3f3f0] px-3 text-sm font-medium tabular-nums`}
-          >
-            {formatLineStoris(line)}
-          </div>
+        <FormField label={tile ? `Pjovimo storis · plyta ${tile.heightMm} mm` : "Pjovimo storis"}>
+          <Input
+            id={`storis-${line.id}`}
+            name={`lineStoris-${index}`}
+            type="number"
+            min={1}
+            step={1}
+            value={
+              line.storisMm && line.storisMm > 0
+                ? line.storisMm
+                : tile?.defaultStorisMm || tile?.heightMm || ""
+            }
+            onChange={(event) =>
+              onChange({
+                ...line,
+                storisMm: Number(event.target.value) || 0,
+              })
+            }
+            className={`${controlClass} tabular-nums`}
+          />
         </FormField>
 
         <FormField label="Kiekis" htmlFor={`quantity-${line.id}`}>
@@ -442,11 +455,21 @@ function readProposalFromDom(current: Proposal): Proposal {
       parsedQuantity > 0
         ? parsedQuantity
         : (existing?.quantity ?? 1);
+    const storisInput = (
+      existing
+        ? document.getElementById(`storis-${existing.id}`)
+        : document.querySelector(`input[name="lineStoris-${index}"]`)
+    ) as HTMLInputElement | null;
+    const parsedStoris = storisInput ? Number(storisInput.value) : existing?.storisMm;
+    const storisMm =
+      parsedStoris !== undefined && Number.isFinite(parsedStoris) && parsedStoris > 0
+        ? Math.round(parsedStoris)
+        : existing?.storisMm;
 
     tileLines.push(
       existing
-        ? { ...existing, tileId, quantity }
-        : { ...createEmptyTileLine(tileId), quantity },
+        ? { ...existing, tileId, quantity, storisMm }
+        : { ...createEmptyTileLine(tileId), quantity, storisMm },
     );
   }
 

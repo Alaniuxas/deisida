@@ -23,11 +23,17 @@ function collectTileLines(form: FormData): TileLine[] {
     const unitRaw = str(form, `lineUnit-${index}`);
     const quantityUnit: QuantityUnit =
       unitRaw === "pieces" ? "pieces" : "pallets";
+    const storisRaw = form.get(`lineStoris-${index}`);
+    const parsedStoris = Number(storisRaw);
     lines.push({
       id: createLineId(),
       tileId,
       quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
       quantityUnit,
+      storisMm:
+        Number.isFinite(parsedStoris) && parsedStoris > 0
+          ? Math.round(parsedStoris)
+          : undefined,
     });
   }
   return lines;
@@ -68,6 +74,9 @@ export function proposalToQueryString(proposal: Proposal): string {
     params.set(`lineTile-${index}`, line.tileId);
     params.set(`lineQty-${index}`, String(line.quantity));
     params.set(`lineUnit-${index}`, line.quantityUnit);
+    if (line.storisMm && line.storisMm > 0) {
+      params.set(`lineStoris-${index}`, String(line.storisMm));
+    }
   });
   return params.toString();
 }

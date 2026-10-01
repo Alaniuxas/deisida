@@ -224,6 +224,8 @@ async function main(): Promise<void> {
   const importedTiles = await importTiles();
   const importedClients = await importClients();
   const importedMachines = await importMachines();
+  const { importCuttingNorms } = await import("../src/lib/queue/excel-norms");
+  const cutting = await importCuttingNorms();
 
   console.log(
     JSON.stringify(
@@ -232,6 +234,7 @@ async function main(): Promise<void> {
         tiles: importedTiles,
         clients: importedClients,
         machines: importedMachines,
+        cutting,
         discs: 0,
         password: STARTER_PASSWORD,
       },

@@ -73,7 +73,7 @@ export async function fetchNextJob(): Promise<NextJobResponse> {
 }
 
 export async function switchConveyor(
-  machineCode: "KONV" | "KNEW",
+  machineCode: string,
 ): Promise<NextJobResponse> {
   return request<NextJobResponse>("/api/jobs/conveyor", {
     method: "POST",

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { handleApiError, jsonError, jsonOk } from "@/lib/api";
 import { switchWorkerConveyor } from "@/lib/queue/service";
-import type { MachineCode } from "@/lib/production-types";
 
 function redirectToPath(path: string): NextResponse {
   return new NextResponse(null, {
@@ -34,13 +33,13 @@ export async function POST(request: Request) {
   try {
     const user = await requireUser(["admin", "cechas"]);
     const contentType = request.headers.get("content-type") ?? "";
-    const machineCode = (await parseMachineCode(request)) as MachineCode;
+    const machineCode = (await parseMachineCode(request)).trim();
 
-    if (machineCode !== "KONV" && machineCode !== "KNEW") {
+    if (!machineCode) {
       if (isFormPost(contentType)) {
         return redirectToPath("/cechas?switchError=invalid");
       }
-      return jsonError("Pasirinkite KONV arba KNEW.");
+      return jsonError("Pasirinkite stakles.");
     }
 
     const next = await switchWorkerConveyor(user.userId, machineCode);

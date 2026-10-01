@@ -15,10 +15,16 @@ import {
   getRotationsAdminData,
   getActiveRotationMachineId,
 } from "@/lib/queue/rotations";
-import { resolveShopCode } from "@/lib/queue/shop-code";
+import { resolveShopCode, sortShopCodes } from "@/lib/queue/shop-code";
+import { ensureCuttingNorms, ensureShopMachines } from "@/lib/queue/excel-norms";
 import { ensureWorkNorms, getWorkNorms } from "@/lib/queue/work-norms";
 import { scheduleQueue } from "@/lib/queue/schedule";
-import { orderJobsByWidthCorrection } from "@/lib/queue/width-order";
+import { orderJobsByP1P2P3 } from "@/lib/queue/width-order";
+import {
+  getLatestPlanRun,
+  getPlanItemsForRun,
+} from "@/lib/queue/plan";
+import { isTimestampInLockedWeek, type LockedWeek } from "@/lib/queue/week";
 import type { Machine as PlannerMachine, QueueJob as PlannerJob } from "@/lib/queue/types";
 import {
   DEFAULT_CHANGEOVER_MINUTES,
@@ -41,6 +47,7 @@ import type {
   JobScheduleInfo,
   QueueJob as ApiQueueJob,
   MachineCode,
+  ClusterPriority,
 } from "@/lib/production-types";
 import type { PackagingOptions } from "@/lib/types";
 import { defaultPackaging } from "@/lib/types";
@@ -54,7 +61,6 @@ export interface QueuedJob extends JobRow {
   address: string;
   pjovimas: string;
   packaging: PackagingOptions;
-  tileHeightMm: number;
 }
 
 interface BuiltSchedule {
@@ -64,6 +70,11 @@ interface BuiltSchedule {
   machineById: Map<string, typeof machines.$inferSelect>;
   assignmentMap: Map<string, ReturnType<typeof scheduleQueue>[number]>;
   jobRows: QueuedJob[];
+  lockedWeek: LockedWeek | null;
+  laterLockedCount: number;
+  aiComments: string[];
+  aiSource: "claude" | "mock" | null;
+  planRunId: string | null;
 }
 
 function parsePackaging(json: string): PackagingOptions {
@@ -81,7 +92,6 @@ async function loadQueuedJobs(): Promise<QueuedJob[]> {
       job: jobs,
       tileName: tiles.name,
       tileQuantityPerPallet: tiles.quantityPerPallet,
-      tileHeightMm: tiles.heightMm,
       proposalNumber: proposals.number,
       clientName: proposals.clientName,
       object: proposals.object,
@@ -105,7 +115,6 @@ async function loadQueuedJobs(): Promise<QueuedJob[]> {
     address: row.address,
     pjovimas: row.pjovimas,
     packaging: parsePackaging(row.packagingJson),
-    tileHeightMm: row.tileHeightMm,
   }));
 }
 
@@ -127,6 +136,7 @@ function toPlannerMachines(
     currentWidthMm: machine.currentWidthMm ?? 0,
     dailyRatePieces: machine.dailyRate,
     changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
+    piecesPerDay: machine.piecesPerDay ?? undefined,
   }));
 }
 
@@ -134,7 +144,9 @@ function toPlannerJobs(jobRows: QueuedJob[]): PlannerJob[] {
   return jobRows.map((job) => ({
     id: job.id,
     tileWidthMm: job.widthMm,
+    storisMm: job.storisMm,
     quantityPallets: toPalletCount(job),
+    pieceCount: job.pieceCount,
     deadline: job.deadline,
     cutType: job.pjovimas,
     proposalId: job.proposalId,
@@ -183,16 +195,20 @@ function buildAssignmentReason(
       ? formatWaitHours(assignment.otherStartHours)
       : null;
 
-  if (assignment.pickCriterion === "start" && otherCode && otherStart) {
-    return `Priskirta ${thisCode}, nes ${otherCode} eilė ilgesnė — čia galima pradėti ${thisStart}, ten ${otherStart}.`;
+  if (assignment.pickCriterion === "p1") {
+    return `P1: tas pats plotis ir storis — palikta ant ${thisCode} (${job.widthMm}×${job.storisMm} mm).`;
   }
-
+  if (assignment.pickCriterion === "p2") {
+    return `P2: tas pats plotis ${job.widthMm} mm (kitas storis) — ${thisCode}, kad neskiltų korekcija.`;
+  }
+  if (assignment.pickCriterion === "far" && otherCode) {
+    return `Tuščios ${thisCode} gavo tolimiausią bloką nuo ${otherCode} (${job.widthMm} mm), ne kaimyninį mm.`;
+  }
   if (assignment.pickCriterion === "width" && otherCode) {
-    return `Priskirta ${thisCode}: pradžios panašios (skirtumas ≤ 4 val.), arčiau planinio pločio nei ${otherCode} (${job.widthMm} mm).`;
+    return `Priskirta ${thisCode}: arčiau planinio pločio nei ${otherCode} (${job.widthMm} mm).`;
   }
-
   if (assignment.pickCriterion === "rate") {
-    return `Priskirta ${thisCode}: pradžia ir plotis panašūs, didesnis našumas (${machine.dailyRate} pal./d.).`;
+    return `Priskirta ${thisCode}: didesnis našumas (${machine.dailyRate} pal./d.).`;
   }
 
   if (assignment.changeoverHours > 0) {
@@ -203,13 +219,28 @@ function buildAssignmentReason(
 }
 
 async function buildSchedule(): Promise<BuiltSchedule | null> {
+  await ensureShopMachines();
   const [jobRows, machineRows] = await Promise.all([
     loadQueuedJobs(),
     db.select().from(machines).orderBy(asc(machines.code)),
   ]);
 
   if (jobRows.length === 0) {
-    return null;
+    return {
+      assignments: [],
+      machineRows,
+      machineCodeById: new Map(
+        machineRows.map((machine) => [machine.id, machine.code]),
+      ),
+      machineById: new Map(machineRows.map((machine) => [machine.id, machine])),
+      assignmentMap: new Map(),
+      jobRows,
+      lockedWeek: null,
+      laterLockedCount: 0,
+      aiComments: [],
+      aiSource: null,
+      planRunId: null,
+    };
   }
 
   const machineCodeById = new Map(
@@ -217,10 +248,47 @@ async function buildSchedule(): Promise<BuiltSchedule | null> {
   );
   const machineById = new Map(machineRows.map((machine) => [machine.id, machine]));
 
-  const assignments = scheduleQueue(
+  const latestRun = await getLatestPlanRun();
+  let assignments = scheduleQueue(
     toPlannerMachines(machineRows),
     toPlannerJobs(jobRows),
   );
+  let lockedWeek: LockedWeek | null = null;
+  let laterLockedCount = 0;
+  let aiComments: string[] = [];
+  let aiSource: "claude" | "mock" | null = null;
+  let planRunId: string | null = null;
+
+  if (latestRun) {
+    planRunId = latestRun.id;
+    lockedWeek = {
+      startIso: latestRun.lockedWeekStart,
+      endIso: latestRun.lockedWeekEnd,
+    };
+    try {
+      aiComments = JSON.parse(latestRun.aiCommentsJson) as string[];
+    } catch {
+      aiComments = [];
+    }
+    aiSource = latestRun.aiSource === "claude" ? "claude" : "mock";
+
+    const items = await getPlanItemsForRun(latestRun.id);
+    const itemByJob = new Map(items.map((item) => [item.jobId, item]));
+    assignments = assignments.map((assignment) => {
+      const item = itemByJob.get(assignment.jobId);
+      if (!item) return assignment;
+      return {
+        ...assignment,
+        machineId: item.machineId,
+        estimatedStart: new Date(item.plannedStart),
+        estimatedEnd: new Date(item.plannedEnd),
+        priority: (item.priority as ClusterPriority) ?? assignment.priority,
+        tileWidthMm: item.widthMm || assignment.tileWidthMm,
+        storisMm: item.storisMm || assignment.storisMm,
+      };
+    });
+    laterLockedCount = items.filter((item) => !item.lockedWeek).length;
+  }
 
   const assignmentMap = new Map(
     assignments.map((assignment) => [assignment.jobId, assignment]),
@@ -233,6 +301,11 @@ async function buildSchedule(): Promise<BuiltSchedule | null> {
     machineById,
     assignmentMap,
     jobRows,
+    lockedWeek,
+    laterLockedCount,
+    aiComments,
+    aiSource,
+    planRunId,
   };
 }
 
@@ -248,6 +321,7 @@ function toJobScheduleInfo(
 
   return {
     widthMm: job.widthMm,
+    storisMm: job.storisMm,
     deadline: job.deadline,
     conveyorCode: machine.code as MachineCode,
     conveyorShopCode: machineShopCode(machine),
@@ -266,6 +340,8 @@ function toJobScheduleInfo(
     positionInQueue,
     requiresChangeover: assignment.changeoverHours > 0,
     assignmentReason,
+    priority: assignment.priority,
+    editable: false,
   };
 }
 
@@ -280,7 +356,7 @@ function toApiQueueJob(
     client: job.clientName,
     object: job.object,
     deadline: job.deadline,
-    storisMm: job.tileHeightMm,
+    storisMm: job.storisMm,
     widthMm: job.widthMm,
     quantityPlanned: job.quantity,
     quantityUnit: job.quantityUnit as "pieces" | "pallets",
@@ -301,10 +377,12 @@ function sortJobsForLane(
       ? inProgress[inProgress.length - 1].job.widthMm
       : machineCurrentWidthMm;
 
-  const orderedRest = orderJobsByWidthCorrection(
+  const orderedRest = orderJobsByP1P2P3(
     rest,
     startWidthMm,
+    inProgress.at(-1)?.job.storisMm ?? 0,
     (item) => item.job.widthMm,
+    (item) => item.job.storisMm,
     (item) => item.job.deadline,
   );
 
@@ -312,11 +390,22 @@ function sortJobsForLane(
 }
 
 export async function getScheduledQueue(): Promise<QueueResponse> {
+  const empty: QueueResponse = {
+    lanes: [],
+    groups: [],
+    lockedWeekStart: null,
+    lockedWeekEnd: null,
+    laterLockedCount: 0,
+    aiComments: [],
+    aiSource: null,
+    planRunId: null,
+  };
   const built = await buildSchedule();
   if (!built) {
-    return { lanes: [], groups: [] };
+    return empty;
   }
 
+  await ensureCuttingNorms();
   await ensureWorkNorms();
   const workNormRows = await getWorkNorms();
   const workNormByCode = new Map(
@@ -325,8 +414,12 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
 
   const lanes: QueueLane[] = [];
   const grouped = new Map<number, QueueWidthGroup>();
+  const orderedMachines = [...built.machineRows].sort((left, right) => {
+    const codes = sortShopCodes([left.code, right.code]);
+    return codes.indexOf(left.code) - codes.indexOf(right.code);
+  });
 
-  for (const machine of built.machineRows) {
+  for (const machine of orderedMachines) {
     const machineJobs = built.jobRows
       .map((job) => {
         const assignment = built.assignmentMap.get(job.id);
@@ -344,14 +437,26 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
         } => item !== null,
       );
 
+    const visibleJobs = built.lockedWeek
+      ? machineJobs.filter(
+          ({ job, assignment }) =>
+            job.status === "in_progress" ||
+            isTimestampInLockedWeek(assignment.estimatedStart, built.lockedWeek!),
+        )
+      : machineJobs;
+    const laterOnLane = built.lockedWeek
+      ? machineJobs.length - visibleJobs.length
+      : 0;
+
     const effectiveWidth = getEffectiveMachineWidth(
       machine.currentWidthMm,
-      machineJobs.map((item) => item.job),
+      visibleJobs.map((item) => item.job),
     );
     const machineCurrentWidthMm = effectiveWidth.widthMm;
-    const ordered = sortJobsForLane(machineJobs, machine.currentWidthMm ?? 0);
+    const ordered = sortJobsForLane(visibleJobs, machine.currentWidthMm ?? 0);
     const machineCode = machine.code as MachineCode;
-    const workNormPiecesPerDay = workNormByCode.get(machineCode);
+    const workNormPiecesPerDay =
+      workNormByCode.get(machineCode) ?? machine.piecesPerDay ?? undefined;
 
     const laneJobs: ApiQueueJob[] = ordered.map(({ job, assignment }, index) => {
       const assignmentReason = buildAssignmentReason(
@@ -368,6 +473,10 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
         assignmentReason,
         workNormPiecesPerDay,
       );
+      schedule.editable = Boolean(
+        built.lockedWeek &&
+          isTimestampInLockedWeek(assignment.estimatedStart, built.lockedWeek),
+      );
       const apiJob = toApiQueueJob(job, schedule);
 
       const widthGroup = grouped.get(job.widthMm) ?? { widthMm: job.widthMm, jobs: [] };
@@ -378,6 +487,7 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     });
 
     lanes.push({
+      id: machine.id,
       code: machineCode,
       shopCode: machineShopCode(machine),
       name: machine.title,
@@ -389,6 +499,7 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
       rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
       changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
       jobs: laneJobs,
+      laterJobCount: laterOnLane,
     });
   }
 
@@ -405,7 +516,16 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     });
   }
 
-  return { lanes, groups };
+  return {
+    lanes,
+    groups,
+    lockedWeekStart: built.lockedWeek?.startIso ?? null,
+    lockedWeekEnd: built.lockedWeek?.endIso ?? null,
+    laterLockedCount: built.laterLockedCount,
+    aiComments: built.aiComments,
+    aiSource: built.aiSource,
+    planRunId: built.planRunId,
+  };
 }
 
 async function countLoggedQuantity(jobId: string): Promise<number> {
@@ -429,7 +549,7 @@ function toShopJob(
     id: job.id,
     tileName: job.tileName,
     proposalNumber: job.proposalNumber,
-    storisMm: job.tileHeightMm,
+    storisMm: job.storisMm,
     quantityPlanned,
     quantityLogged,
     quantityUnit: job.quantityUnit as "pieces" | "pallets",

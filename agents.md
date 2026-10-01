@@ -8,11 +8,15 @@ Tile manufacturing ops platform — proposals, production queue, and shop-floor 
 npm install
 npm run db:import   # first time: import Bubble archive into SQLite
 npm run db:seed-rotation   # minimal demo: users, machines, norms, rotation period
-npm run db:norms    # import darbo normos from CSV
+npm run db:cutting-norms   # Excel NK1/NK2/S1… cutting speeds (also `npm run db:norms`)
+npm run db:seed-queue      # ~30 archive orders into the queue
+npm run queue:plan         # generate Friday-style unlimited plan + lock next week
 npm run dev
 ```
 
-Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127`.
+Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127` (tmux `deisida-dev`).
+
+Do not deploy without asking Alanas.
 
 ## Login (seeded from archive)
 
@@ -29,58 +33,39 @@ Starter password for all imported users: **`deisida`**
 | cechas | daiva@deisida.lt | |
 | cechas | *(+ 30 more @deisida.lt / test.lt)* | Darbuotojas |
 
-Full user list: run `npm run db:import` and inspect `data/deisida.db`, or query `users` table.
-
 ## Routes
 
 | Path | Role | Purpose |
 |------|------|---------|
 | `/prisijungti` | public | Credential login |
 | `/pasiulymai` | admin, pardavimai | Proposal list |
-| `/plyteliu-baras` | admin, pardavimai | Tile catalog (~296 from Bricks import) |
-| `/pasiulymai/naujas` | admin, pardavimai | Create proposal (catalog from Bricks import) |
+| `/plyteliu-baras` | admin, pardavimai | Tile catalog |
+| `/pasiulymai/naujas` | admin, pardavimai | Create proposal |
 | `/pasiulymai/[id]` | admin, pardavimai | Edit / save / confirm proposal |
-| `/eile` | admin, pardavimai, cechas | Production queue by conveyor lane (KONV/KNEW) |
+| `/eile` | admin, pardavimai, cechas | Queue tabs = Excel shop codes (NK1, NK2, S1, S2, S4, SK1); only locked week |
 | `/cechas` | admin, cechas | Next job, pallet log, finish |
-| `/admin/konvejeriai` | admin | Rotacijos periodai, priskyrimai, darbo normos, KONV/KNEW nustatymai |
+| `/admin/konvejeriai` | admin | Rotations, assignments, Excel vnt./d. |
 
-## API stubs (for agents / shop UI)
+## Queue (P1/P2/P3)
 
-- `GET /api/jobs/queue` — scheduled queue via `scheduleQueue(machines, jobs)`
-- `GET /api/jobs/next` — next job for logged-in cechas user’s assigned machine
-- `POST /api/jobs/:id/pallet` — log +1 paletė
-- `POST /api/jobs/:id/finish` — complete job; &lt;90 % → alert
-- `GET/POST /api/admin/assignments` — people ↔ machine (fallback be aktyvaus periodo)
-- `GET/POST/PATCH /api/admin/rotations` — rotacijos periodai, perkėlimas su priežastimi
-- `PATCH /api/admin/machines/:id` — `dailyRate`, `rotationHours`, `currentWidthMm`, `shopCode`
+- `jobs.storisMm` is cut-tile thickness (proposal line / `default_storis_mm`), **not** `tiles.heightMm`.
+- Engine (`src/lib/queue/schedule.ts`): P1 same width+storis clustered; P2 same width; P3 deadline. Empty machine gets the **farthest** width (≥20 mm), so 101+102 stay with a 100 mm machine.
+- Friday **00:00 Europe/Vilnius** (`vercel.json` cron `0 0 * * 5` → `/api/cron/queue-plan`). UI shows next Mon–Sun. PATCH/POST `/api/jobs/queue/override` → **403** outside that week.
+- Claude `anthropic/claude-sonnet-4.6` via AI Gateway: audit comments only. Mock if no `AI_GATEWAY_API_KEY`.
+- ICE confirm: `POST /api/proposals/submit` still 303 `/eile`.
+
+## API
+
+- `GET /api/jobs/queue` — scheduled + week-filtered lanes
+- `POST /api/jobs/queue/override` — move job in locked week (reason required)
+- `GET /api/cron/queue-plan` — planner (Bearer `CRON_SECRET` if set)
+- `GET /api/jobs/next` — next job for cechas machine
+- `POST /api/jobs/:id/pallet` / `finish`
+- `GET/POST /api/admin/assignments`, rotations, `PATCH /api/admin/machines/:id`
 
 ## Data
 
-- SQLite: `data/deisida.db` (Drizzle schema in `src/lib/db/schema.ts`)
-- Import: `scripts/import-archive.ts` from Bubble archive zip
-- Machines: **KONV** = Senas konvejeris (`id-code` **SK1** → `shop_code`, unique in machines CSV). **KNEW** = Naujas konvejeris; `id-code` is **NK1 and NK2** (same `identifier` KNEW) so `shop_code` is left empty — do not invent sk1/sk2. Pal./d. from machines CSV: KONV `goal_daily_rate_per_employee` 240, KNEW `goal_daily_rate` 720.
-- Eilės vnt./d.: tik KONV iš `Darbo_normos` eilutės „Plytų pjovimas plytelėmis – konvejeriu“ (2700). „Staklytėm“ 1700 **nėra** KNEW (CSV mašinos `STAK` / Staklytės). KNEW vnt./d. nerodomas — Bubble `Normas` turi daug KNEW* eilučių su skirtingais min kiekiais.
-- `/eile`: lipnūs **nuorodos**-tabai `?konvejeris=KONV|KNEW` (veikia be JS). Tabo antraštė — `machines.title` (Senas/Naujas konvejeris), po juo kodas + mm + pal./d. · vnt./d. jei yra. Numatytasis — pirmas konvejeris su darbais, kitaip KONV.
-- Demo eilė: `npm run db:seed-queue` importuoja ~30 jau patvirtintų Bubble pasiūlymų (esami nerūšiuojami).
-- Konvejerio rotacijos: periodai (`rotation_periods`), priskyrimai, istorija su priežastimi; demo: `npm run db:seed-rotation`
-- Cechas naudoja aktyvų rotacijos priskyrimą šiandienai; fallback — `machine_assignments`
-- Proposal form includes **adresas** (object address), persisted on `proposals.address`
-- `/eile`, `/cechas`, `/admin/konvejeriai` load data server-side (no client fetch/HMR dependency behind Cloudflare tunnel)
-- Gamybos eilė (patvirtinta formulė): darbai pagal terminą; kiekvienas → konvejeris su anksčiausia `start = eilės valandos + 0.5 val. jei planinis plotis ≠ darbo plotis`. Planinis plotis pradžioje tik DB `current_width_mm` (0 = nežinomas, visada reguliavimas, kol priskiriamas pirmas darbas). Jei |startKONV − startKNEW| ≤ 4 val. — mažesnis |Δ mm|; kitaip ankstesnė pradžia; tada didesnis pal./d. Tuščias konvejeris laimi prieš ilgą eilę net jei kitas jau tame plotyje. Konvejeryje: nearest-neighbor nuo įrašyto pločio.
-- `/eile`: viršuje lipnūs KONV/KNEW tabai su tikrais pavadinimais; matomas tik pasirinktas konvejeris. Antraštė: „Kitas darbas pagal konvejerį ir plotį.“
-- Admin ir `/eile` naudoja tą patį efektyvų konvejerio plotį (`getEffectiveMachineWidth`: DB → aktyvus darbas → eilėje).
-- Pjūviai (baras): native `<select>` su „Nežinau“.
-- `Pridėti eilutę`: GET `formMethod` ant to paties formos (RT4). **Patvirtinti** / juodraštis — native `POST /api/proposals/submit` (303 `/eile`), veikia be JS.
-- Cechas „Baigti darbą“: native `<select name="reasonPreset">` + papildomas tekstas; privaloma, jei neužbaigtas planas.
-- Login `/prisijungti` uses native form POST (303 relative redirect; works without JS/HMR)
-- `/cechas` write actions (paletė, baigti, keisti įrenginį) use native `<form method="post">` + 303 redirect
-- Patvirtinti → one gamybos darbas per plytelių eilutė (E2: 2 tipai → 2 darbai)
-- Discs table empty (Alanas adds manually later)
-
-## Proposal slice (unchanged behaviour)
-
-- Per line: plytelė, auto pjovimo storis, kiekis vnt./paletės, kaina už vnt.
-- PDF downloads: `{numeris}_Klientui.pdf` / `{numeris}_Gamyba.pdf`
-- Confirm proposal → one job per tile line
-
-Do not deploy without asking Alanas.
+- SQLite: `data/deisida.db`
+- Excel (gitignored copy): `data/2026.06.30_Deisida_normos_FINAL.xlsx` — cutting sheets **PLY1/PLY2**. Leftover sheets: SVIES, PLOK, PLYK, Kodavimas, Eur.Val Tikslai. Seed JSON: `src/lib/queue/cutting-norms.seed.json`
+- Machines: shop codes NK1/NK2/S1/S2/S4/SK1 (legacy ids KNEW→NK1, KONV→SK1)
+- Proposal form: editable pjovimo storis per line; confirm → `jobs.storisMm`

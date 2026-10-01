@@ -36,7 +36,7 @@ export function ConveyorSwitchForm({
           Keisti įrenginį
         </div>
 
-        {switchedCode === "KONV" || switchedCode === "KNEW" ? (
+        {switchedCode ? (
           <p className="rounded-xl border border-deisida/30 bg-deisida/5 px-4 py-3 text-base font-medium text-deisida">
             Įrenginys pakeistas į {switchedCode}
             {switchedLabel ? ` (${switchedLabel})` : ""}.
@@ -52,7 +52,7 @@ export function ConveyorSwitchForm({
         <p className="text-base">
           Dabar dirbate:{" "}
           <span className="font-semibold text-ink">
-            {currentCode} — {currentName}
+            {currentShopCode || currentCode} — {currentName}
           </span>
         </p>
 
@@ -68,7 +68,7 @@ export function ConveyorSwitchForm({
                   aria-current="true"
                   className="flex h-14 items-center justify-center rounded-xl bg-deisida px-4 text-base font-semibold text-deisida-foreground opacity-90"
                 >
-                  {machine.code}
+                  {machine.shopCode || machine.code}
                   <span className="ml-2 font-normal opacity-80">{machine.name}</span>
                 </button>
               );
@@ -86,7 +86,7 @@ export function ConveyorSwitchForm({
                   type="submit"
                   className="flex h-14 w-full items-center justify-center rounded-xl border border-stone-line bg-paper px-4 text-base font-semibold text-ink hover:bg-muted/60"
                 >
-                  {machine.code}
+                  {machine.shopCode || machine.code}
                   <span className="ml-2 font-normal opacity-80">{machine.name}</span>
                 </button>
               </form>
