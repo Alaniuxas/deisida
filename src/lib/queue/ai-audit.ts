@@ -32,7 +32,7 @@ export interface AuditResult {
   source: "claude" | "mock";
 }
 
-const MODEL = anthropic("claude-sonnet-4-20250514");
+const MODEL = anthropic("claude-sonnet-4-6");
 
 function heuristicComments(input: AuditInput): string[] {
   const comments: string[] = [];
