@@ -1,7 +1,7 @@
 import { DEFAULT_CHANGEOVER_MINUTES, SHIFT_HOURS } from "./constants";
 import { addWorkDuration, snapToWorkStart, WORK_HOURS_PER_DAY, WORK_START_HOUR } from "./work-hours";
 import type { LockedWeek } from "./week";
-import { addCalendarDays, zonedTimeToUtc } from "./week";
+import { addCalendarDays, vilniusDateIso, zonedTimeToUtc } from "./week";
 import type { Machine, PickCriterion, QueueJob } from "./types";
 
 export interface BalancedMachineState extends Machine {
@@ -223,7 +223,9 @@ export function recordSpreadHours(
     if (overlapEnd > overlapStart) {
       globalDayLoads[day] += (overlapEnd - overlapStart) / (60 * 60 * 1000);
     }
-    if (start.toISOString().slice(0, 10) <= dayIso && end.toISOString().slice(0, 10) >= dayIso) {
+    const startDay = vilniusDateIso(start);
+    const endDay = vilniusDateIso(end);
+    if (startDay <= dayIso && endDay >= dayIso && end.getTime() > dayCursors[day].getTime()) {
       dayCursors[day] = end;
     }
   }

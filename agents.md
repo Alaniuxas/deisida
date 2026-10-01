@@ -14,7 +14,7 @@ npm run queue:plan         # generate Friday-style unlimited plan + lock next we
 npm run dev
 ```
 
-Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127` (tmux `deisida-dev`).
+Open http://127.0.0.1:43127 — Next.js dev server binds `0.0.0.0:43127` (tmux `deisida-dev`). If `EADDRINUSE :43127`, an old dev server is still running — kill that process or reuse it (not a planner bug).
 
 Do not deploy without asking Alanas.
 
@@ -49,7 +49,7 @@ Starter password for all imported users: **`deisida`**
 ## Queue (P1/P2/P3)
 
 - `jobs.storisMm` is cut-tile thickness (proposal line / `default_storis_mm`), **not** `tiles.heightMm`.
-- Engine (`src/lib/queue/schedule.ts` + `balance.ts`): P1 same width+storis clustered; P2 same width; P3 deadline. Within a machine, P3 jobs sort by **nearest deadline first** (width proximity only breaks ties). **Load balance:** jobs spread across NK1/NK2/S1/S2/S4/SK1 by planned hours (P1/P2 width affinity kept); locked-week work anchored to Mon 08:00 and spread Mon–Fri. Empty machine gets the **farthest** width (≥20 mm), so 101+102 stay with a 100 mm machine.
+- Engine (`src/lib/queue/schedule.ts` + `balance.ts`): P1 same width+storis clustered; P2 same width; P3 deadline. Within a machine, P3 jobs sort by **nearest deadline first** (width proximity only breaks ties). **Load balance:** jobs spread across NK1/NK2/S1/S2/S4/SK1 by planned hours (P1/P2 width affinity kept); empty machine gets the **farthest** width (≥20 mm), so 101+102 stay with a 100 mm machine. **Locked-week timing:** each machine's first job picks the lightest Mon–Fri day (Vilnius); every following job chains `plannedEnd → plannedStart` within 08:00–17:00 (overflow next workday). `lockedCount` = jobs whose `plannedStart` falls in the locked Mon–Sun window — only realistic capacity fits in-week; the rest spill to later weeks.
 - AI audit (`ai-audit.ts`): comments on `/eile`; engine rebalances first — Claude may suggest locked-week machine moves only if gaps remain.
 - **Work hours:** planned start/end only **Mon–Fri 08:00–17:00 Europe/Vilnius** (`src/lib/queue/work-hours.ts`). Overflow past 17:00 continues next workday at 08:00.
 - Friday **00:00 Europe/Vilnius** (`vercel.json` cron `0 0 * * 5` → `/api/cron/queue-plan`). UI shows next Mon–Sun. PATCH/POST `/api/jobs/queue/override` → **403** outside that week.

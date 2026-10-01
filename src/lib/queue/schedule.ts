@@ -349,7 +349,7 @@ export function scheduleQueue(
     );
     let runningWidthMm = storedWidthOrUnknown(machine.currentWidthMm);
     let elapsedHours = 0;
-    let cursor = referenceTime;
+    let machineCursor = referenceTime;
     let previous: QueueJob | null = null;
 
     orderedJobs.forEach((job, jobIndex) => {
@@ -360,7 +360,8 @@ export function scheduleQueue(
       );
       const pick = picks.get(job.id);
 
-      if (dayCursors && options.lockedWeek) {
+      let cursor = machineCursor;
+      if (dayCursors && options.lockedWeek && jobIndex === 0) {
         cursor = spreadCursorForJob(
           options.lockedWeek,
           dayCursors,
@@ -404,7 +405,7 @@ export function scheduleQueue(
       });
 
       elapsedHours += durationHours;
-      cursor = estimatedEnd;
+      machineCursor = estimatedEnd;
       runningWidthMm = job.tileWidthMm;
       previous = job;
     });
