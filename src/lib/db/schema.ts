@@ -144,6 +144,57 @@ export const machineAssignments = sqliteTable("machine_assignments", {
     .references(() => machines.id, { onDelete: "cascade" }),
 });
 
+export const workNorms = sqliteTable("work_norms", {
+  id: text("id").primaryKey(),
+  machineCode: text("machine_code", { enum: ["KONV", "KNEW"] }).notNull(),
+  label: text("label").notNull(),
+  minPiecesPerDay: integer("min_pieces_per_day").notNull(),
+  unit: text("unit").notNull().default("pieces"),
+  sourceRow: text("source_row"),
+  importedAt: text("imported_at").notNull(),
+});
+
+export const rotationPeriods = sqliteTable("rotation_periods", {
+  id: text("id").primaryKey(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  createdAt: text("created_at").notNull(),
+  createdById: text("created_by_id").references(() => users.id),
+  note: text("note"),
+});
+
+export const rotationAssignments = sqliteTable("rotation_assignments", {
+  id: text("id").primaryKey(),
+  periodId: text("period_id")
+    .notNull()
+    .references(() => rotationPeriods.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  machineId: text("machine_id").references(() => machines.id, {
+    onDelete: "set null",
+  }),
+  assignedAt: text("assigned_at").notNull(),
+});
+
+export const rotationHistory = sqliteTable("rotation_history", {
+  id: text("id").primaryKey(),
+  periodId: text("period_id")
+    .notNull()
+    .references(() => rotationPeriods.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  fromMachineId: text("from_machine_id").references(() => machines.id),
+  toMachineId: text("to_machine_id").references(() => machines.id),
+  changedAt: text("changed_at").notNull(),
+  changedById: text("changed_by_id").references(() => users.id),
+  reason: text("reason"),
+  action: text("action", {
+    enum: ["plan", "reassign", "release"],
+  }).notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type TileRow = typeof tiles.$inferSelect;
 export type ClientRow = typeof clients.$inferSelect;
@@ -151,3 +202,7 @@ export type MachineRow = typeof machines.$inferSelect;
 export type ProposalRow = typeof proposals.$inferSelect;
 export type ProposalLineRow = typeof proposalLines.$inferSelect;
 export type JobRow = typeof jobs.$inferSelect;
+export type WorkNormRow = typeof workNorms.$inferSelect;
+export type RotationPeriodRow = typeof rotationPeriods.$inferSelect;
+export type RotationAssignmentRow = typeof rotationAssignments.$inferSelect;
+export type RotationHistoryRow = typeof rotationHistory.$inferSelect;

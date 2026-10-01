@@ -11,6 +11,10 @@ import {
   alerts,
   type JobRow,
 } from "@/lib/db/schema";
+import {
+  getRotationsAdminData,
+  getActiveRotationMachineId,
+} from "@/lib/queue/rotations";
 import { scheduleQueue } from "@/lib/queue/schedule";
 import type { Machine as PlannerMachine, QueueJob as PlannerJob } from "@/lib/queue/types";
 import {
@@ -436,20 +440,34 @@ function toShopJob(
 }
 
 export async function getNextJobForUser(userId: string): Promise<NextJobResponse> {
-  const [assignment] = await db
-    .select({
-      machine: machines,
-    })
-    .from(machineAssignments)
-    .innerJoin(machines, eq(machineAssignments.machineId, machines.id))
-    .where(eq(machineAssignments.userId, userId))
-    .limit(1);
+  const rotationMachineId = await getActiveRotationMachineId(userId);
 
-  if (!assignment) {
-    return { conveyor: null, job: null };
+  let machine: (typeof machines.$inferSelect) | undefined;
+
+  if (rotationMachineId) {
+    const [rotationMachine] = await db
+      .select()
+      .from(machines)
+      .where(eq(machines.id, rotationMachineId))
+      .limit(1);
+    machine = rotationMachine;
   }
 
-  const machine = assignment.machine;
+  if (!machine) {
+    const [assignment] = await db
+      .select({
+        machine: machines,
+      })
+      .from(machineAssignments)
+      .innerJoin(machines, eq(machineAssignments.machineId, machines.id))
+      .where(eq(machineAssignments.userId, userId))
+      .limit(1);
+    machine = assignment?.machine;
+  }
+
+  if (!machine) {
+    return { conveyor: null, job: null };
+  }
   const queue = await getScheduledQueue();
   const lane = queue.lanes.find((item) => item.code === machine.code);
 
@@ -564,7 +582,8 @@ export async function finishJob(
 }
 
 export async function getAssignments(): Promise<AssignmentsResponse> {
-  const [peopleRows, machineRows, assignmentRows, built] = await Promise.all([
+  const [peopleRows, machineRows, assignmentRows, built, rotations] =
+    await Promise.all([
     db
       .select()
       .from(users)
@@ -573,6 +592,7 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
     db.select().from(machines).orderBy(asc(machines.code)),
     db.select().from(machineAssignments),
     buildSchedule(),
+    getRotationsAdminData(),
   ]);
 
   const people: Person[] = peopleRows.map((person) => ({
@@ -581,10 +601,22 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
   }));
 
   const assignedByMachine = new Map<string, string[]>();
-  for (const assignment of assignmentRows) {
-    const current = assignedByMachine.get(assignment.machineId) ?? [];
-    current.push(assignment.userId);
-    assignedByMachine.set(assignment.machineId, current);
+  const useRotation =
+    rotations.activePeriod &&
+    Object.keys(rotations.activeAssignments).length > 0;
+
+  if (useRotation) {
+    for (const [machineId, personIds] of Object.entries(
+      rotations.activeAssignments,
+    )) {
+      assignedByMachine.set(machineId, personIds);
+    }
+  } else {
+    for (const assignment of assignmentRows) {
+      const current = assignedByMachine.get(assignment.machineId) ?? [];
+      current.push(assignment.userId);
+      assignedByMachine.set(assignment.machineId, current);
+    }
   }
 
   const adminMachines: AdminMachine[] = machineRows.map((machine) => {
@@ -608,7 +640,7 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
     };
   });
 
-  return { people, machines: adminMachines };
+  return { people, machines: adminMachines, rotations };
 }
 
 export async function switchWorkerConveyor(

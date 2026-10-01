@@ -138,6 +138,41 @@ export function initializeDatabase(): void {
       machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
       PRIMARY KEY (user_id, machine_id)
     );
+    CREATE TABLE IF NOT EXISTS work_norms (
+      id TEXT PRIMARY KEY,
+      machine_code TEXT NOT NULL,
+      label TEXT NOT NULL,
+      min_pieces_per_day INTEGER NOT NULL,
+      unit TEXT NOT NULL DEFAULT 'pieces',
+      source_row TEXT,
+      imported_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS rotation_periods (
+      id TEXT PRIMARY KEY,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      created_by_id TEXT REFERENCES users(id),
+      note TEXT
+    );
+    CREATE TABLE IF NOT EXISTS rotation_assignments (
+      id TEXT PRIMARY KEY,
+      period_id TEXT NOT NULL REFERENCES rotation_periods(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      machine_id TEXT REFERENCES machines(id) ON DELETE SET NULL,
+      assigned_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS rotation_history (
+      id TEXT PRIMARY KEY,
+      period_id TEXT NOT NULL REFERENCES rotation_periods(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      from_machine_id TEXT REFERENCES machines(id),
+      to_machine_id TEXT REFERENCES machines(id),
+      changed_at TEXT NOT NULL,
+      changed_by_id TEXT REFERENCES users(id),
+      reason TEXT,
+      action TEXT NOT NULL
+    );
   `);
 
   const proposalColumns = sqlite

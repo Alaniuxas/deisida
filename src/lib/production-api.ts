@@ -1,12 +1,15 @@
 import {
   AssignmentsRequest,
   AssignmentsResponse,
+  CreateRotationPeriodRequest,
   FinishJobRequest,
   FinishJobResponse,
   MachinePatchRequest,
   NextJobResponse,
   ProductionApiError,
   QueueResponse,
+  ReassignRotationRequest,
+  RotationsAdminData,
   ShopJob,
 } from "@/lib/production-types";
 
@@ -114,6 +117,28 @@ export async function patchMachine(
   body: MachinePatchRequest,
 ): Promise<AssignmentsResponse> {
   return request<AssignmentsResponse>(`/api/admin/machines/${machineId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchRotations(): Promise<RotationsAdminData> {
+  return request<RotationsAdminData>("/api/admin/rotations");
+}
+
+export async function createRotationPeriod(
+  body: CreateRotationPeriodRequest,
+): Promise<RotationsAdminData> {
+  return request<RotationsAdminData>("/api/admin/rotations", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function reassignRotation(
+  body: ReassignRotationRequest,
+): Promise<RotationsAdminData> {
+  return request<RotationsAdminData>("/api/admin/rotations", {
     method: "PATCH",
     body: JSON.stringify(body),
   });

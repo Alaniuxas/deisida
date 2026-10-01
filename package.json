@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:import": "tsx scripts/import-archive.ts"
+    "db:import": "tsx scripts/import-archive.ts",
+    "db:norms": "tsx scripts/import-work-norms.ts",
+    "db:seed-rotation": "tsx scripts/seed-rotation-demo.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

@@ -133,6 +133,60 @@ export interface Machine {
 export interface AssignmentsResponse {
   people: Person[];
   machines: Machine[];
+  rotations?: RotationsAdminData;
+}
+
+export interface WorkNorm {
+  id: string;
+  machineCode: MachineCode;
+  label: string;
+  minPiecesPerDay: number;
+  unit: string;
+  sourceRow: string | null;
+}
+
+export interface RotationPeriodSummary {
+  id: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  note: string | null;
+  isActive: boolean;
+}
+
+export interface RotationHistoryEntry {
+  id: string;
+  changedAt: string;
+  personName: string;
+  fromCode: MachineCode | null;
+  toCode: MachineCode | null;
+  reason: string | null;
+  action: "plan" | "reassign" | "release";
+  changedByName: string | null;
+  periodStartDate: string;
+  periodEndDate: string;
+}
+
+export interface RotationsAdminData {
+  periods: RotationPeriodSummary[];
+  activePeriod: RotationPeriodSummary | null;
+  activeAssignments: Record<string, string[]>;
+  history: RotationHistoryEntry[];
+  workNorms: WorkNorm[];
+}
+
+export interface CreateRotationPeriodRequest {
+  startDate: string;
+  endDate?: string;
+  note?: string;
+  assignments: { personId: string; machineId: string | null }[];
+}
+
+export interface ReassignRotationRequest {
+  periodId: string;
+  personId: string;
+  machineId: string | null;
+  reason: string;
 }
 
 export interface AssignmentsRequest {
