@@ -44,10 +44,14 @@ export interface JobScheduleInfo {
   changeoverHours: number;
   durationHours: number;
   estimatedStart: string;
+  /** Pjovimo pradžia po operatoriaus reguliavimo (jei buvo). */
+  productionStart: string;
   estimatedEnd: string;
   positionInQueue: number;
   requiresChangeover: boolean;
   assignmentReason: string;
+  /** Laiko balanso / perkėlimo pranešimas (geltonas blokas eilėje). */
+  moveReason?: string;
   priority?: ClusterPriority;
   editable?: boolean;
 }
@@ -110,6 +114,8 @@ export interface QueueLane {
   code: MachineCode;
   shopCode: string;
   name: string;
+  /** Admin / operator setting — never changes when jobs are rebalanced. */
+  storedWidthMm: number;
   currentWidthMm: number;
   widthSource: MachineWidthSource;
   widthHint: string | null;
@@ -121,6 +127,12 @@ export interface QueueLane {
   laterJobCount: number;
 }
 
+export interface QueueRebalanceInfo {
+  canRebalance: boolean;
+  pendingMoveCount: number;
+  reason: string;
+}
+
 export interface QueueResponse {
   lanes: QueueLane[];
   groups: QueueWidthGroup[];
@@ -130,6 +142,9 @@ export interface QueueResponse {
   aiComments: string[];
   aiSource: "claude" | "mock" | null;
   planRunId: string | null;
+  planStatus: "ready" | "accepted" | null;
+  rebalance: QueueRebalanceInfo | null;
+  unassignedJobs: QueueJob[];
 }
 
 export interface Person {
@@ -142,7 +157,9 @@ export interface Machine {
   code: MachineCode;
   shopCode: string;
   name: string;
+  /** Legacy DB column; planavimas naudoja workNormPiecesPerDay. */
   dailyRatePallets: number;
+  workNormPiecesPerDay: number;
   rotationHours: number;
   currentWidthMm: number;
   storedWidthMm: number;
@@ -210,12 +227,20 @@ export interface ReassignRotationRequest {
   reason: string;
 }
 
+export interface UpdateRotationPeriodRequest {
+  periodId: string;
+  startDate?: string;
+  endDate?: string;
+  note?: string;
+}
+
 export interface AssignmentsRequest {
   assignments: { personId: string; machineId: string }[];
 }
 
 export interface MachinePatchRequest {
   dailyRatePallets?: number;
+  workNormPiecesPerDay?: number;
   rotationHours?: number;
   currentWidthMm?: number;
   shopCode?: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   PackagingOptions,
   Proposal,
@@ -26,6 +26,7 @@ import {
   downloadProductionProposalPdf,
 } from "@/components/pdf/proposal-pdf";
 import { ClientProposalPreview } from "@/components/client-proposal-preview";
+import { ProposalEnqueuePanel } from "@/components/production/proposal-enqueue-panel";
 import { ProductionProposalPreview } from "@/components/production-proposal-preview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { LithuanianDatePicker } from "@/components/lithuanian-date-picker";
 import { Textarea } from "@/components/ui/textarea";
-import { Download } from "lucide-react";
+import { Download, Maximize2 } from "lucide-react";
+import { ProposalPreviewOverlay } from "@/components/proposal-preview-overlay";
 import {
   clearProposalDraft,
   loadProposalDraft,
@@ -314,38 +316,6 @@ function TileLineEditor({
   );
 }
 
-function DownloadButtons({
-  onDownload,
-  loading,
-}: {
-  onDownload: (kind: PdfKind) => void;
-  loading: boolean;
-}) {
-  return (
-    <>
-      <Button
-        type="button"
-        variant="outline"
-        className="h-10 gap-2 border-deisida-muted text-deisida-muted hover:bg-[#f3f3f0]"
-        onClick={() => onDownload("production")}
-        disabled={loading}
-      >
-        <Download className="size-4" />
-        Atsisiųsti gamybai
-      </Button>
-      <Button
-        type="button"
-        className="h-10 gap-2 bg-deisida text-deisida-foreground hover:bg-deisida/90"
-        onClick={() => onDownload("client")}
-        disabled={loading}
-      >
-        <Download className="size-4" />
-        {loading ? "Palaukite…" : "Atsisiųsti klientui"}
-      </Button>
-    </>
-  );
-}
-
 interface ProposalCreatorProps {
   catalog: Tile[];
   proposalId?: string;
@@ -500,20 +470,7 @@ function buildInitialProposal(
   );
   const withLines = ensureProposalLineCount(seeded, initialLineCount);
 
-  if (
-    initialProposal ||
-    editingId ||
-    seedTileIds.some(Boolean) ||
-    Boolean(seedFields?.client || seedFields?.object)
-  ) {
-    return withLines;
-  }
-
-  const draft = loadProposalDraft();
-  if (!draft) return withLines;
-
-  const merged = ensureProposalLineCount(draft, initialLineCount);
-  return merged.tileLines.length >= withLines.tileLines.length ? merged : withLines;
+  return withLines;
 }
 
 export function ProposalCreator({
@@ -548,17 +505,24 @@ export function ProposalCreator({
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("edit");
   const [previewDoc, setPreviewDoc] = useState<PreviewDoc>("client");
+  const [previewExpanded, setPreviewExpanded] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
   const pendingScrollLineIndex = useRef<number | null>(null);
   const addLinePath = savedId ? `/pasiulymai/${savedId}` : "/pasiulymai/naujas";
 
-  useLayoutEffect(() => {
-    setProposal((current) => readProposalFromDom(current));
-  }, []);
-
   useEffect(() => {
     setRuntimeCatalog(catalog);
   }, [catalog]);
+
+  useEffect(() => {
+    if (proposalId || initialProposal) return;
+    const draft = loadProposalDraft();
+    if (!draft) return;
+    setProposal((current) => {
+      const merged = ensureProposalLineCount(draft, initialLineCount);
+      return merged.tileLines.length >= current.tileLines.length ? merged : current;
+    });
+  }, [proposalId, initialProposal, initialLineCount]);
 
   useEffect(() => {
     setProposal((current) => {
@@ -742,7 +706,7 @@ export function ProposalCreator({
     mobileTab === "production" || (!isMobileLayout && previewDoc === "production");
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
       <form
         id="proposal-form"
         method="post"
@@ -764,16 +728,6 @@ export function ProposalCreator({
             </h1>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 border-stone-line bg-paper"
-              onClick={() =>
-                setProposal(createDefaultProposal(catalog[0]?.id))
-              }
-            >
-              Naujas pasiūlymas
-            </Button>
             <button
               type="submit"
               name="intent"
@@ -784,16 +738,26 @@ export function ProposalCreator({
             >
               {saveState === "saving" ? "Saugoma…" : "Išsaugoti juodraštį"}
             </button>
-            <button
-              type="submit"
-              name="intent"
-              value="sent"
-              formAction="/api/proposals/submit"
-              disabled={saveState === "saving" || status === "confirmed"}
-              className="inline-flex h-10 items-center justify-center rounded-md border border-deisida-muted px-4 text-sm font-medium text-deisida-muted disabled:opacity-50"
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 gap-2 border-deisida-muted text-deisida-muted hover:bg-[#f3f3f0]"
+              onClick={() => handleDownloadPdf("production")}
+              disabled={pdfState === "loading"}
             >
-              Pažymėti išsiųstu
-            </button>
+              <Download className="size-4" />
+              Atsisiųsti gamybai
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 gap-2 border-deisida-muted text-deisida-muted hover:bg-[#f3f3f0]"
+              onClick={() => handleDownloadPdf("client")}
+              disabled={pdfState === "loading"}
+            >
+              <Download className="size-4" />
+              {pdfState === "loading" ? "Palaukite…" : "Atsisiųsti klientui"}
+            </Button>
             <button
               type="submit"
               name="intent"
@@ -805,10 +769,6 @@ export function ProposalCreator({
             >
               Patvirtinti
             </button>
-            <DownloadButtons
-              onDownload={handleDownloadPdf}
-              loading={pdfState === "loading"}
-            />
           </div>
         </div>
         {saveMessage ? (
@@ -827,6 +787,13 @@ export function ProposalCreator({
         ) : null}
       </header>
 
+      {savedId && (status === "confirmed" || status === "in_production") ? (
+        <ProposalEnqueuePanel
+          proposalId={savedId}
+          defaultDeadline={proposal.serviceDeadline}
+        />
+      ) : null}
+
       <div className="mb-0 border-b border-stone-line bg-[#ececea] xl:hidden">
         <Tabs
           value={mobileTab}
@@ -841,9 +808,10 @@ export function ProposalCreator({
         </Tabs>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden xl:flex-row">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="xl:flex xl:items-start">
         <div
-          className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${
+          className={`min-w-0 flex-1 ${
             showEditor ? "block" : "hidden xl:block"
           }`}
         >
@@ -890,7 +858,6 @@ export function ProposalCreator({
                     setProposal({ ...proposal, client: event.target.value })
                   }
                   placeholder="Kliento pavadinimas"
-                  aria-invalid={!proposal.client.trim()}
                   className={controlClass}
                 />
               </FormField>
@@ -903,7 +870,6 @@ export function ProposalCreator({
                     setProposal({ ...proposal, object: event.target.value })
                   }
                   placeholder="Objekto pavadinimas"
-                  aria-invalid={!proposal.object.trim()}
                   className={controlClass}
                 />
               </FormField>
@@ -1031,30 +997,43 @@ export function ProposalCreator({
         </div>
 
         <aside
-          className={`min-h-0 flex-col overflow-hidden border-stone-line bg-[#f3f3f0] xl:w-[min(520px,42vw)] xl:flex-shrink-0 xl:border-l ${
+          className={`flex-col border-stone-line bg-[#f3f3f0] xl:sticky xl:top-0 xl:w-[min(520px,42vw)] xl:flex-shrink-0 xl:border-l ${
             mobileTab === "edit" ? "hidden xl:flex" : "flex"
           }`}
         >
-          <div className="flex items-center justify-between border-b border-stone-line px-6 py-4 lg:px-8">
+          <div className="flex items-center justify-between gap-2 border-b border-stone-line px-6 py-4 lg:px-8">
             <h2 className="text-lg font-semibold text-deisida-muted">Peržiūra</h2>
-            <Tabs
-              value={previewDoc}
-              onValueChange={(value) => setPreviewDoc(value as PreviewDoc)}
-              className="hidden xl:block"
-            >
-              <TabsList className="h-10">
-                <TabsTrigger value="client">Klientui</TabsTrigger>
-                <TabsTrigger value="production">Gamyba</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 border-stone-line bg-paper text-deisida-muted"
+                onClick={() => setPreviewExpanded(true)}
+              >
+                <Maximize2 className="size-3.5" />
+                <span className="hidden sm:inline">Per vidurį</span>
+              </Button>
+              <Tabs
+                value={previewDoc}
+                onValueChange={(value) => setPreviewDoc(value as PreviewDoc)}
+                className="hidden xl:block"
+              >
+                <TabsList className="h-10">
+                  <TabsTrigger value="client">Klientui</TabsTrigger>
+                  <TabsTrigger value="production">Gamyba</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-6 lg:p-8">
+          <div className="p-6 lg:p-8">
             {showClientPreview ? (
               <ClientProposalPreview
                 proposal={proposal}
                 loading={pdfState === "loading"}
                 error={pdfState === "error" ? pdfError : null}
                 compact={isMobileLayout && mobileTab === "client"}
+                narrow={!isMobileLayout}
               />
             ) : null}
             {showProductionPreview ? (
@@ -1067,7 +1046,18 @@ export function ProposalCreator({
             ) : null}
           </div>
         </aside>
+        </div>
       </div>
+
+      <ProposalPreviewOverlay
+        open={previewExpanded}
+        onOpenChange={setPreviewExpanded}
+        proposal={proposal}
+        previewDoc={previewDoc}
+        onPreviewDocChange={setPreviewDoc}
+        loading={pdfState === "loading"}
+        error={pdfState === "error" ? pdfError : null}
+      />
       </form>
     </div>
   );

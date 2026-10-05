@@ -6,6 +6,18 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   role: text("role", { enum: ["admin", "pardavimai", "cechas"] }).notNull(),
   passwordHash: text("password_hash").notNull(),
+  workerPinHash: text("worker_pin_hash"),
+});
+
+export const discs = sqliteTable("discs", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  diameterMm: integer("diameter_mm"),
+  thicknessMm: integer("thickness_mm"),
+  supplier: text("supplier").notNull().default(""),
+  priceEur: real("price_eur"),
+  workId: text("work_id"),
 });
 
 export const tiles = sqliteTable("tiles", {
@@ -21,6 +33,7 @@ export const tiles = sqliteTable("tiles", {
   heightMm: integer("height_mm").notNull().default(0),
   defaultStorisMm: integer("default_storis_mm").notNull().default(0),
   description: text("description").notNull().default(""),
+  discId: text("disc_id").references(() => discs.id),
   disc: text("disc"),
   hardness: integer("hardness"),
   fragilityStrip: text("fragility_strip"),
@@ -46,12 +59,6 @@ export const machines = sqliteTable("machines", {
   piecesPerDay: integer("pieces_per_day"),
   rotationHours: real("rotation_hours"),
   currentWidthMm: integer("current_width_mm"),
-});
-
-export const discs = sqliteTable("discs", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
 });
 
 export const proposals = sqliteTable("proposals", {
@@ -123,9 +130,24 @@ export const palletLogs = sqliteTable("pallet_logs", {
     .notNull()
     .references(() => jobs.id, { onDelete: "cascade" }),
   quantity: integer("quantity").notNull(),
+  goodQuantity: integer("good_quantity").notNull().default(0),
+  defectQuantity: integer("defect_quantity").notNull().default(0),
+  comment: text("comment"),
   damaged: integer("damaged", { mode: "boolean" }).notNull().default(false),
   loggedAt: text("logged_at").notNull(),
   loggedById: text("logged_by_id").references(() => users.id),
+});
+
+export const machineDowntimes = sqliteTable("machine_downtimes", {
+  id: text("id").primaryKey(),
+  machineId: text("machine_id")
+    .notNull()
+    .references(() => machines.id, { onDelete: "cascade" }),
+  startAt: text("start_at").notNull(),
+  endAt: text("end_at").notNull(),
+  reason: text("reason").notNull().default(""),
+  createdAt: text("created_at").notNull(),
+  createdById: text("created_by_id").references(() => users.id),
 });
 
 export const alerts = sqliteTable("alerts", {
@@ -257,6 +279,7 @@ export const rotationHistory = sqliteTable("rotation_history", {
 });
 
 export type User = typeof users.$inferSelect;
+export type DiscRow = typeof discs.$inferSelect;
 export type TileRow = typeof tiles.$inferSelect;
 export type ClientRow = typeof clients.$inferSelect;
 export type MachineRow = typeof machines.$inferSelect;
@@ -268,6 +291,8 @@ export type CuttingNormRow = typeof cuttingNorms.$inferSelect;
 export type QueuePlanRunRow = typeof queuePlanRuns.$inferSelect;
 export type QueuePlanItemRow = typeof queuePlanItems.$inferSelect;
 export type QueueOverrideRow = typeof queueOverrides.$inferSelect;
+export type MachineDowntimeRow = typeof machineDowntimes.$inferSelect;
+export type PalletLogRow = typeof palletLogs.$inferSelect;
 export type RotationPeriodRow = typeof rotationPeriods.$inferSelect;
 export type RotationAssignmentRow = typeof rotationAssignments.$inferSelect;
 export type RotationHistoryRow = typeof rotationHistory.$inferSelect;

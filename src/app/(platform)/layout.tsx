@@ -15,7 +15,7 @@ export default async function PlatformLayout({
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <AppNav user={user} />
-      <div className="min-h-0 flex-1">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </div>
   );
 }

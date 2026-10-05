@@ -21,6 +21,8 @@ interface ClientProposalPreviewProps {
   loading?: boolean;
   error?: string | null;
   compact?: boolean;
+  /** Šoninėje juostoje — be horizontalaus slinkimo */
+  narrow?: boolean;
 }
 
 export function ClientProposalPreview({
@@ -28,6 +30,7 @@ export function ClientProposalPreview({
   loading = false,
   error = null,
   compact = false,
+  narrow = false,
 }: ClientProposalPreviewProps) {
   const pricing = getProposalPricing(proposal);
   const clientPackaging = describeClientPackaging(proposal.packaging);
@@ -101,8 +104,18 @@ export function ClientProposalPreview({
 
       <section className="mb-6">
         <h2 className="mb-3 text-base font-semibold text-deisida-muted">Pasiūlymas</h2>
-        <div className="overflow-x-auto rounded-md border border-stone-line">
-          <table className="min-w-[640px] w-full table-fixed border-collapse">
+        <div
+          className={
+            narrow
+              ? "rounded-md border border-stone-line"
+              : "overflow-x-auto rounded-md border border-stone-line"
+          }
+        >
+          <table
+            className={`w-full table-fixed border-collapse ${
+              narrow ? "text-[11px]" : "min-w-[640px]"
+            }`}
+          >
             <colgroup>
               <col className="w-[20%]" />
               <col className="w-[17%]" />

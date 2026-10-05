@@ -1,12 +1,15 @@
+/** Excel pjovimo norma — rodoma vnt./d. (ne paletės; planavimas skaičiuoja iš vnt./d.). */
 export function formatPalletRateWithNorm(
-  palletsPerDay: number,
+  _palletsPerDay: number,
   piecesPerDay?: number | null,
 ): string {
-  const pallets = `${palletsPerDay} pal./d.`;
   if (piecesPerDay != null && piecesPerDay > 0) {
-    return `${pallets} · ${piecesPerDay.toLocaleString("lt-LT")} vnt./d.`;
+    return `${piecesPerDay.toLocaleString("lt-LT")} vnt./d.`;
   }
-  return pallets;
+  if (_palletsPerDay > 0) {
+    return `${_palletsPerDay} pal./d. (legacy)`;
+  }
+  return "norma nenustatyta";
 }
 
 export function conveyorDisplayLabel(

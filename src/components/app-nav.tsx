@@ -19,6 +19,7 @@ const linksForRole: Record<UserRole, { href: string; label: string }[]> = {
     { href: "/pasiulymai", label: "Pasiūlymai" },
     { href: "/eile", label: "Eilė" },
     { href: "/cechas", label: "Cechas" },
+    { href: "/admin/statistika", label: "Statistika" },
     { href: "/admin/konvejeriai", label: "Konvejeriai" },
   ],
   pardavimai: [
@@ -29,15 +30,30 @@ const linksForRole: Record<UserRole, { href: string; label: string }[]> = {
   cechas: [{ href: "/cechas", label: "Cechas" }],
 };
 
+const homeForRole: Record<UserRole, string> = {
+  admin: "/plyteliu-baras",
+  pardavimai: "/plyteliu-baras",
+  cechas: "/cechas",
+};
+
+/** Sunkūs puslapiai — be prefetch, kad nebekrautų plano fone. */
+const noPrefetchHrefs = new Set([
+  "/eile",
+  "/admin/konvejeriai",
+  "/admin/statistika",
+  "/pasiulymai",
+]);
+
 export function AppNav({ user }: AppNavProps) {
   const pathname = usePathname();
   const links = linksForRole[user.role];
+  const homeHref = homeForRole[user.role];
 
   return (
-    <header className="border-b border-stone-line bg-white">
+    <header className="sticky top-0 z-40 border-b border-stone-line bg-white">
       <div className="flex flex-col gap-4 px-6 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-10">
         <div className="flex items-center gap-8">
-          <Link href="/plyteliu-baras" className="block">
+          <Link href={homeHref} className="block">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-deisida">
               Deisida
             </p>
@@ -48,6 +64,7 @@ export function AppNav({ user }: AppNavProps) {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={noPrefetchHrefs.has(link.href) ? false : undefined}
                 className={cn(
                   "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   pathname.startsWith(link.href)

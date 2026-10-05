@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getIronSession, type SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
@@ -31,7 +32,7 @@ export async function getSession() {
   return getIronSession<SessionData>(await cookies(), sessionOptions);
 }
 
-export async function getCurrentUser(): Promise<SessionData | null> {
+export const getCurrentUser = cache(async (): Promise<SessionData | null> => {
   const session = await getSession();
   if (!session.userId || !session.email || !session.name || !session.role) {
     return null;
@@ -42,7 +43,7 @@ export async function getCurrentUser(): Promise<SessionData | null> {
     name: session.name,
     role: session.role,
   };
-}
+});
 
 export async function requireUser(roles?: UserRole[]): Promise<SessionData> {
   const user = await getCurrentUser();
@@ -53,6 +54,42 @@ export async function requireUser(roles?: UserRole[]): Promise<SessionData> {
     throw new Error("FORBIDDEN");
   }
   return user;
+}
+
+const PIN_PATTERN = /^\d{4,6}$/;
+
+export async function loginByPin(pin: string): Promise<SessionData | null> {
+  const normalized = pin.trim();
+  if (!PIN_PATTERN.test(normalized)) {
+    return null;
+  }
+
+  const cechasUsers = await db
+    .select()
+    .from(users)
+    .where(eq(users.role, "cechas"));
+
+  for (const user of cechasUsers) {
+    if (!user.workerPinHash) continue;
+    const valid = await bcrypt.compare(normalized, user.workerPinHash);
+    if (!valid) continue;
+
+    const session = await getSession();
+    session.userId = user.id;
+    session.email = user.email;
+    session.name = user.name;
+    session.role = user.role as UserRole;
+    await session.save();
+
+    return {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role as UserRole,
+    };
+  }
+
+  return null;
 }
 
 export async function loginUser(

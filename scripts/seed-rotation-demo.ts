@@ -10,6 +10,7 @@ import { formatDateIso, todayIso } from "../src/lib/queue/rotation-dates";
 import { importWorkNorms } from "../src/lib/queue/work-norms";
 
 const STARTER_PASSWORD = "deisida";
+const WORKER_PIN = "1234";
 
 const DEMO_USERS = [
   { id: "admin-danas", email: "danas@deisida.lt", name: "Danas", role: "admin" as const },
@@ -19,14 +20,26 @@ const DEMO_USERS = [
   { id: "cechas-rasa", email: "rasa@deisida.lt", name: "Rasa", role: "cechas" as const },
 ];
 
-async function seedUsers(passwordHash: string): Promise<void> {
+async function seedUsers(
+  passwordHash: string,
+  workerPinHash: string,
+): Promise<void> {
   for (const person of DEMO_USERS) {
     await db
       .insert(users)
-      .values({ ...person, passwordHash })
+      .values({
+        ...person,
+        passwordHash,
+        workerPinHash: person.role === "cechas" ? workerPinHash : null,
+      })
       .onConflictDoUpdate({
         target: users.email,
-        set: { name: person.name, role: person.role, passwordHash },
+        set: {
+          name: person.name,
+          role: person.role,
+          passwordHash,
+          workerPinHash: person.role === "cechas" ? workerPinHash : null,
+        },
       });
   }
 }
@@ -122,8 +135,9 @@ async function seedDemoRotation(adminId: string): Promise<void> {
 async function main(): Promise<void> {
   initializeDatabase();
   const passwordHash = await bcrypt.hash(STARTER_PASSWORD, 10);
+  const workerPinHash = await bcrypt.hash(WORKER_PIN, 10);
 
-  await seedUsers(passwordHash);
+  await seedUsers(passwordHash, workerPinHash);
   await seedMachines();
   await importWorkNorms();
 
@@ -141,6 +155,7 @@ async function main(): Promise<void> {
     JSON.stringify(
       {
         password: STARTER_PASSWORD,
+        workerPin: WORKER_PIN,
         admin: "danas@deisida.lt",
         periodStart: todayIso(),
         periodEnd: defaultPeriodEnd(formatDateIso(new Date())),

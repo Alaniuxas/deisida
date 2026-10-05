@@ -66,20 +66,19 @@ function laneTier(
   jobWidthMm: number,
   jobStorisMm: number,
 ): LaneTier {
-  if (
-    jobWidthMm === currentWidthMm &&
-    jobStorisMm === currentStorisMm &&
-    jobStorisMm > 0
-  ) {
-    return 1;
-  }
   if (jobWidthMm === currentWidthMm) {
+    if (
+      jobStorisMm > 0 &&
+      (currentStorisMm <= 0 || jobStorisMm === currentStorisMm)
+    ) {
+      return 1;
+    }
     return 2;
   }
   return 3;
 }
 
-/** P1 same width+storis, P2 same width, P3 deadline — greedy from current setup. */
+/** P1 same width+storis, P2 same width, P3 — mažiausias mm žingsnis, po to terminas. */
 export function orderJobsByP1P2P3<T>(
   jobs: T[],
   startWidthMm: number,
@@ -87,6 +86,8 @@ export function orderJobsByP1P2P3<T>(
   getWidth: (job: T) => number,
   getStoris: (job: T) => number,
   getDeadline: (job: T) => Date | string,
+  getProposalId?: (job: T) => string,
+  getPieceCount?: (job: T) => number,
 ): T[] {
   const remaining = [...jobs];
   const ordered: T[] = [];
@@ -112,6 +113,17 @@ export function orderJobsByP1P2P3<T>(
       }
 
       if (leftTier === 1) {
+        if (getProposalId) {
+          const leftProposal = getProposalId(left);
+          const rightProposal = getProposalId(right);
+          if (leftProposal === rightProposal) {
+            const leftPieces = getPieceCount?.(left) ?? 0;
+            const rightPieces = getPieceCount?.(right) ?? 0;
+            if (leftPieces !== rightPieces) {
+              return leftPieces - rightPieces;
+            }
+          }
+        }
         return compareDeadlines(getDeadline(left), getDeadline(right));
       }
 
@@ -124,15 +136,19 @@ export function orderJobsByP1P2P3<T>(
         return compareDeadlines(getDeadline(left), getDeadline(right));
       }
 
-      const deadlineGap = compareDeadlines(getDeadline(left), getDeadline(right));
-      if (deadlineGap !== 0) {
-        return deadlineGap;
-      }
+      if (leftTier === 3) {
+        const leftWidthDelta = widthDelta(currentWidthMm, getWidth(left));
+        const rightWidthDelta = widthDelta(currentWidthMm, getWidth(right));
+        if (leftWidthDelta !== rightWidthDelta) {
+          return leftWidthDelta - rightWidthDelta;
+        }
 
-      const leftWidthDelta = widthDelta(currentWidthMm, getWidth(left));
-      const rightWidthDelta = widthDelta(currentWidthMm, getWidth(right));
-      if (leftWidthDelta !== rightWidthDelta) {
-        return leftWidthDelta - rightWidthDelta;
+        const deadlineGap = compareDeadlines(getDeadline(left), getDeadline(right));
+        if (deadlineGap !== 0) {
+          return deadlineGap;
+        }
+
+        return getWidth(left) - getWidth(right);
       }
 
       return getWidth(left) - getWidth(right);

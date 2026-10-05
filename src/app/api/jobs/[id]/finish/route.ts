@@ -22,8 +22,11 @@ async function parseReason(request: Request): Promise<string | undefined> {
 
   if (contentType.includes("application/json")) {
     const body = await request.json().catch(() => ({}));
-    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
-    return reason || undefined;
+    const customReason = typeof body.reason === "string" ? body.reason.trim() : "";
+    const presetReason =
+      typeof body.reasonPreset === "string" ? body.reasonPreset.trim() : "";
+    const combined = customReason || presetReason;
+    return combined || undefined;
   }
 
   const form = await request.formData();

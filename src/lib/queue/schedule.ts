@@ -10,13 +10,19 @@ import {
 import {
   assignJobsWithLoadBalance,
   createDayCursors,
-  rebalanceEmptyMachines,
+  rebalanceMachineLoads,
+  lockedWeekMondayStart,
   recordSpreadHours,
   scheduleBalancedJob,
-  spreadCursorForJob,
   type BalancedMachineState,
 } from "./balance";
-import { addWorkDuration } from "./work-hours";
+import { addWorkDuration, snapToWorkStart } from "./work-hours";
+import {
+  changeoverHoursFromSetup,
+  getEffectiveMachineWidth,
+  nextSetupWidthAfterJob,
+  WIDTH_SETUP_TOLERANCE_MM,
+} from "./machine-width";
 import { orderJobsByP1P2P3 } from "./width-order";
 import type {
   Assignment,
@@ -68,38 +74,25 @@ export function storedWidthOrUnknown(storedWidthMm: number): number | null {
   return storedWidthMm > 0 ? storedWidthMm : null;
 }
 
-export function plannedWidthMatches(
-  plannedWidthMm: number | null | undefined,
-  jobWidthMm: number,
-): boolean {
-  return plannedWidthMm != null && plannedWidthMm > 0 && plannedWidthMm === jobWidthMm;
-}
-
-function changeoverHoursFor(
-  plannedWidthMm: number | null,
-  jobWidthMm: number,
-  changeoverMinutes: number,
-): number {
-  return plannedWidthMatches(plannedWidthMm, jobWidthMm)
-    ? 0
-    : changeoverMinutes / 60;
-}
-
 export function computeJobDurationHours(
   job: Pick<QueueJob, "quantityPallets" | "tileWidthMm" | "pieceCount">,
   machine: Pick<
     Machine,
     "currentWidthMm" | "dailyRatePieces" | "changeoverMinutes" | "piecesPerDay"
   >,
-  plannedWidthMm: number | null = storedWidthOrUnknown(machine.currentWidthMm),
+  setupWidthMm?: number | null,
 ): { durationHours: number; changeoverHours: number; productionHours: number } {
   const piecesPerDay = machine.piecesPerDay ?? 0;
   const productionHours =
     piecesPerDay > 0 && job.pieceCount > 0
       ? (job.pieceCount / piecesPerDay) * SHIFT_HOURS
       : (job.quantityPallets / Math.max(machine.dailyRatePieces, 1)) * HOURS_PER_DAY;
-  const changeoverHours = changeoverHoursFor(
-    plannedWidthMm,
+  const setup =
+    setupWidthMm != null && setupWidthMm > 0
+      ? setupWidthMm
+      : storedWidthOrUnknown(machine.currentWidthMm);
+  const changeoverHours = changeoverHoursFromSetup(
+    setup,
     job.tileWidthMm,
     machine.changeoverMinutes,
   );
@@ -123,7 +116,47 @@ export function sortJobsForMachine(
     (job) => job.tileWidthMm,
     (job) => job.storisMm,
     (job) => job.deadline,
+    (job) => job.proposalId,
+    (job) => job.pieceCount,
   );
+}
+
+/** Per-staklės laiko juosta pagal eilės tvarką (po perskirstymo ar perplanuojant). */
+export function recalculateLaneAssignments(
+  laneItems: Array<{
+    job: { pieceCount: number; widthMm: number; status: string };
+    assignment: Assignment;
+  }>,
+  machine: Machine,
+): Assignment[] {
+  if (laneItems.length === 0) {
+    return [];
+  }
+
+  let cursor = snapToWorkStart(laneItems[0].assignment.estimatedStart);
+  let setupWidthMm = storedWidthOrUnknown(machine.currentWidthMm) ?? 0;
+
+  return laneItems.map(({ job, assignment }) => {
+    const { durationHours, changeoverHours } = computeJobDurationHours(
+      {
+        quantityPallets: assignment.quantityPallets,
+        pieceCount: job.pieceCount,
+        tileWidthMm: job.widthMm,
+      },
+      machine,
+      setupWidthMm,
+    );
+    const { start, end } = addWorkDuration(cursor, durationHours);
+    cursor = end;
+    setupWidthMm = nextSetupWidthAfterJob(setupWidthMm, job.widthMm);
+    return {
+      ...assignment,
+      durationHours,
+      changeoverHours,
+      estimatedStart: start,
+      estimatedEnd: end,
+    };
+  });
 }
 
 function uniqueWidths(jobs: QueueJob[]): number[] {
@@ -228,7 +261,11 @@ function assignWidthsToMachines(
       }
     }
     const criterion: PickCriterion =
-      nearestDist === 0 ? "p1" : nearestDist <= 2 ? "p2" : "width";
+      nearestDist === 0
+        ? "p1"
+        : nearestDist <= WIDTH_SETUP_TOLERANCE_MM
+          ? "p2"
+          : "width";
     assignment.set(widthMm, { machineId: nearest.machineId, criterion });
   }
 
@@ -284,17 +321,33 @@ export function pickMachine(
   return states.find((state) => state.id === pickedId) ?? states[0];
 }
 
-function jobPriority(
-  job: QueueJob,
-  previous: QueueJob | null,
+export function jobPriority(
+  job: Pick<QueueJob, "tileWidthMm" | "storisMm">,
+  previous: Pick<QueueJob, "tileWidthMm" | "storisMm"> | null,
   machineWidthMm: number,
 ): ClusterPriority {
-  const referenceWidth = previous?.tileWidthMm ?? machineWidthMm;
-  const referenceStoris = previous?.storisMm ?? 0;
-  if (job.tileWidthMm === referenceWidth && job.storisMm === referenceStoris && job.storisMm > 0) {
+  if (previous === null) {
+    if (
+      machineWidthMm > 0 &&
+      job.tileWidthMm === machineWidthMm &&
+      job.storisMm > 0
+    ) {
+      return "P1";
+    }
+    if (job.tileWidthMm === machineWidthMm) {
+      return "P2";
+    }
+    return "P3";
+  }
+
+  if (
+    job.tileWidthMm === previous.tileWidthMm &&
+    job.storisMm === previous.storisMm &&
+    job.storisMm > 0
+  ) {
     return "P1";
   }
-  if (job.tileWidthMm === referenceWidth) {
+  if (job.tileWidthMm === previous.tileWidthMm) {
     return "P2";
   }
   return "P3";
@@ -318,7 +371,7 @@ export function scheduleQueue(
     widthAssignment,
   );
   if (balanceLockedWeek) {
-    rebalanceEmptyMachines(machineStates as BalancedMachineState[]);
+    rebalanceMachineLoads(machineStates as BalancedMachineState[]);
   }
 
   for (const job of jobs) {
@@ -343,32 +396,35 @@ export function scheduleQueue(
       : null;
 
   machineStates.forEach((machine, machineIndex) => {
+    const effectiveWidth = getEffectiveMachineWidth(
+      machine.currentWidthMm,
+      machine.assignedJobs.map((job) => ({
+        status: "queued",
+        widthMm: job.tileWidthMm,
+      })),
+    );
     const orderedJobs = sortJobsForMachine(
       machine.assignedJobs,
-      machine.currentWidthMm,
+      effectiveWidth.widthMm,
     );
-    let runningWidthMm = storedWidthOrUnknown(machine.currentWidthMm);
     let elapsedHours = 0;
     let machineCursor = referenceTime;
     let previous: QueueJob | null = null;
+    let setupWidthMm = storedWidthOrUnknown(machine.currentWidthMm) ?? 0;
 
     orderedJobs.forEach((job, jobIndex) => {
       const { durationHours, changeoverHours } = computeJobDurationHours(
         job,
         machine,
-        runningWidthMm,
+        setupWidthMm,
       );
       const pick = picks.get(job.id);
 
       let cursor = machineCursor;
       if (dayCursors && options.lockedWeek && jobIndex === 0) {
-        cursor = spreadCursorForJob(
-          options.lockedWeek,
-          dayCursors,
-          globalDayLoads,
-          machineIndex,
-          jobIndex,
-        );
+        const weekMonday = lockedWeekMondayStart(options.lockedWeek);
+        cursor =
+          machineCursor.getTime() < weekMonday.getTime() ? weekMonday : machineCursor;
       }
 
       const { start: estimatedStart, end: estimatedEnd } = dayCursors
@@ -406,7 +462,7 @@ export function scheduleQueue(
 
       elapsedHours += durationHours;
       machineCursor = estimatedEnd;
-      runningWidthMm = job.tileWidthMm;
+      setupWidthMm = nextSetupWidthAfterJob(setupWidthMm, job.tileWidthMm);
       previous = job;
     });
   });

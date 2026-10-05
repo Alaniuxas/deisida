@@ -33,7 +33,8 @@ export function initializeDatabase(): void {
       email TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       role TEXT NOT NULL,
-      password_hash TEXT NOT NULL
+      password_hash TEXT NOT NULL,
+      worker_pin_hash TEXT
     );
     CREATE TABLE IF NOT EXISTS tiles (
       id TEXT PRIMARY KEY,
@@ -48,6 +49,7 @@ export function initializeDatabase(): void {
       height_mm INTEGER NOT NULL DEFAULT 0,
       default_storis_mm INTEGER NOT NULL DEFAULT 0,
       description TEXT NOT NULL DEFAULT '',
+      disc_id TEXT REFERENCES discs(id),
       disc TEXT,
       hardness INTEGER,
       fragility_strip TEXT,
@@ -75,7 +77,12 @@ export function initializeDatabase(): void {
     CREATE TABLE IF NOT EXISTS discs (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      description TEXT
+      description TEXT,
+      diameter_mm INTEGER,
+      thickness_mm INTEGER,
+      supplier TEXT NOT NULL DEFAULT '',
+      price_eur REAL,
+      work_id TEXT
     );
     CREATE TABLE IF NOT EXISTS proposals (
       id TEXT PRIMARY KEY,
@@ -125,9 +132,21 @@ export function initializeDatabase(): void {
       id TEXT PRIMARY KEY,
       job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
       quantity INTEGER NOT NULL,
+      good_quantity INTEGER NOT NULL DEFAULT 0,
+      defect_quantity INTEGER NOT NULL DEFAULT 0,
+      comment TEXT,
       damaged INTEGER NOT NULL DEFAULT 0,
       logged_at TEXT NOT NULL,
       logged_by_id TEXT REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS machine_downtimes (
+      id TEXT PRIMARY KEY,
+      machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+      start_at TEXT NOT NULL,
+      end_at TEXT NOT NULL,
+      reason TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      created_by_id TEXT REFERENCES users(id)
     );
     CREATE TABLE IF NOT EXISTS alerts (
       id TEXT PRIMARY KEY,
@@ -255,6 +274,52 @@ export function initializeDatabase(): void {
     sqlite.exec(
       `ALTER TABLE proposal_lines ADD COLUMN storis_mm INTEGER NOT NULL DEFAULT 0`,
     );
+  }
+
+  const userColumns = sqlite
+    .prepare("PRAGMA table_info(users)")
+    .all() as { name: string }[];
+  if (!userColumns.some((column) => column.name === "worker_pin_hash")) {
+    sqlite.exec(`ALTER TABLE users ADD COLUMN worker_pin_hash TEXT`);
+  }
+
+  const palletColumns = sqlite
+    .prepare("PRAGMA table_info(pallet_logs)")
+    .all() as { name: string }[];
+  if (!palletColumns.some((column) => column.name === "good_quantity")) {
+    sqlite.exec(`ALTER TABLE pallet_logs ADD COLUMN good_quantity INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!palletColumns.some((column) => column.name === "defect_quantity")) {
+    sqlite.exec(`ALTER TABLE pallet_logs ADD COLUMN defect_quantity INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!palletColumns.some((column) => column.name === "comment")) {
+    sqlite.exec(`ALTER TABLE pallet_logs ADD COLUMN comment TEXT`);
+  }
+
+  const discColumns = sqlite
+    .prepare("PRAGMA table_info(discs)")
+    .all() as { name: string }[];
+  if (!discColumns.some((column) => column.name === "diameter_mm")) {
+    sqlite.exec(`ALTER TABLE discs ADD COLUMN diameter_mm INTEGER`);
+  }
+  if (!discColumns.some((column) => column.name === "thickness_mm")) {
+    sqlite.exec(`ALTER TABLE discs ADD COLUMN thickness_mm INTEGER`);
+  }
+  if (!discColumns.some((column) => column.name === "supplier")) {
+    sqlite.exec(`ALTER TABLE discs ADD COLUMN supplier TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!discColumns.some((column) => column.name === "price_eur")) {
+    sqlite.exec(`ALTER TABLE discs ADD COLUMN price_eur REAL`);
+  }
+  if (!discColumns.some((column) => column.name === "work_id")) {
+    sqlite.exec(`ALTER TABLE discs ADD COLUMN work_id TEXT`);
+  }
+
+  const tileColumns = sqlite
+    .prepare("PRAGMA table_info(tiles)")
+    .all() as { name: string }[];
+  if (!tileColumns.some((column) => column.name === "disc_id")) {
+    sqlite.exec(`ALTER TABLE tiles ADD COLUMN disc_id TEXT REFERENCES discs(id)`);
   }
 
   sqlite.exec(`

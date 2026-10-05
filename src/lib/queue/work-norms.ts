@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { cache } from "react";
 import { parse } from "csv-parse/sync";
 import { db } from "@/lib/db";
 import { workNorms } from "@/lib/db/schema";
@@ -114,9 +115,9 @@ export async function importWorkNorms(csvPath?: string): Promise<number> {
   return norms.length;
 }
 
-export async function getWorkNorms() {
+export const getWorkNorms = cache(async () => {
   return db.select().from(workNorms).orderBy(workNorms.machineCode);
-}
+});
 
 export async function ensureWorkNorms(): Promise<void> {
   const existing = await db

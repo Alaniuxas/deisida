@@ -17,7 +17,22 @@ if (existsSync(envLocal)) {
   }
 }
 
-runFridayQueuePlan()
+function parseAsOfArg(): Date {
+  const flag = process.argv.find((arg) => arg.startsWith("--as-of="));
+  if (!flag) {
+    return new Date();
+  }
+  const value = flag.slice("--as-of=".length);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Invalid --as-of value: ${value}`);
+  }
+  return parsed;
+}
+
+const now = parseAsOfArg();
+
+runFridayQueuePlan(now)
   .then((result) => {
     console.log(JSON.stringify(result, null, 2));
   })

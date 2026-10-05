@@ -4,6 +4,7 @@ import {
   createRotationPeriod,
   getRotationsAdminData,
   reassignRotation,
+  updateRotationPeriod,
 } from "@/lib/queue/rotations";
 
 export async function GET() {
@@ -50,11 +51,30 @@ export async function PATCH(request: Request) {
     const body = await request.json();
 
     const periodId = String(body.periodId ?? "").trim();
+    if (!periodId) {
+      return jsonError("Trūksta periodo.");
+    }
+
+    if (
+      body.startDate !== undefined ||
+      body.endDate !== undefined ||
+      body.note !== undefined
+    ) {
+      const data = await updateRotationPeriod({
+        periodId,
+        startDate: body.startDate ? String(body.startDate) : undefined,
+        endDate: body.endDate ? String(body.endDate) : undefined,
+        note: body.note !== undefined ? String(body.note) : undefined,
+        changedById: user.userId,
+      });
+      return jsonOk(data);
+    }
+
     const personId = String(body.personId ?? "").trim();
     const reason = String(body.reason ?? "").trim();
 
-    if (!periodId || !personId) {
-      return jsonError("Trūksta periodo arba darbuotojo.");
+    if (!personId) {
+      return jsonError("Trūksta darbuotojo.");
     }
 
     const data = await reassignRotation({

@@ -24,6 +24,7 @@
 /data/
 
 # misc
+.tools/
 .DS_Store
 *.pem
 

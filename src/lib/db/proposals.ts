@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, like, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   proposals,
@@ -15,6 +15,29 @@ import { tileRowToTile } from "@/lib/db/tiles";
 
 export interface ProposalWithLines extends ProposalRow {
   lines: ProposalLineRow[];
+}
+
+export interface ProposalListItem {
+  id: string;
+  number: string;
+  clientName: string;
+  object: string;
+  status: ProposalRow["status"];
+  updatedAt: string;
+}
+
+export interface ProposalListFilters {
+  number?: string;
+  client?: string;
+  object?: string;
+  status?: ProposalRow["status"];
+  limit: number;
+  offset: number;
+}
+
+export interface ProposalListPage {
+  items: ProposalListItem[];
+  hasMore: boolean;
 }
 
 function parsePackaging(json: string): PackagingOptions {
@@ -48,6 +71,49 @@ export function proposalToForm(
     })),
     extraClauses: [],
   };
+}
+
+function likeFilter(value: string | undefined, column: typeof proposals.number) {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return like(column, `%${trimmed}%`);
+}
+
+export async function listProposalsPage(
+  filters: ProposalListFilters,
+): Promise<ProposalListPage> {
+  const conditions: SQL[] = [];
+  const numberFilter = likeFilter(filters.number, proposals.number);
+  const clientFilter = likeFilter(filters.client, proposals.clientName);
+  const objectFilter = likeFilter(filters.object, proposals.object);
+  if (numberFilter) conditions.push(numberFilter);
+  if (clientFilter) conditions.push(clientFilter);
+  if (objectFilter) conditions.push(objectFilter);
+  if (filters.status) {
+    conditions.push(eq(proposals.status, filters.status));
+  }
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const rows = await db
+    .select({
+      id: proposals.id,
+      number: proposals.number,
+      clientName: proposals.clientName,
+      object: proposals.object,
+      status: proposals.status,
+      updatedAt: proposals.updatedAt,
+    })
+    .from(proposals)
+    .where(where)
+    .orderBy(desc(proposals.updatedAt))
+    .limit(filters.limit + 1)
+    .offset(filters.offset);
+
+  const hasMore = rows.length > filters.limit;
+  const items = hasMore ? rows.slice(0, filters.limit) : rows;
+
+  return { items, hasMore };
 }
 
 export async function listProposals(): Promise<ProposalWithLines[]> {
@@ -164,6 +230,71 @@ async function getProposalByNumber(
     .limit(1);
   if (!row) return null;
   return getProposalById(row.id);
+}
+
+export async function setProposalStatus(
+  proposalId: string,
+  status: ProposalRow["status"],
+): Promise<ProposalRow> {
+  const proposal = await getProposalById(proposalId);
+  if (!proposal) throw new Error("Pasiūlymas nerastas.");
+
+  if (status === "confirmed") {
+    if (proposal.status === "confirmed" || proposal.status === "in_production") {
+      const [row] = await db
+        .select()
+        .from(proposals)
+        .where(eq(proposals.id, proposalId))
+        .limit(1);
+      if (!row) throw new Error("Pasiūlymas nerastas.");
+      return row;
+    }
+    await confirmProposal(proposalId);
+    const [row] = await db
+      .select()
+      .from(proposals)
+      .where(eq(proposals.id, proposalId))
+      .limit(1);
+    if (!row) throw new Error("Pasiūlymas nerastas.");
+    return row;
+  }
+
+  if (
+    (proposal.status === "confirmed" || proposal.status === "in_production") &&
+    (status === "draft" || status === "sent")
+  ) {
+    throw new Error("Negalima grąžinti patvirtinto pasiūlymo į ankstesnę būseną.");
+  }
+
+  if (
+    status === "in_production" &&
+    proposal.status !== "confirmed" &&
+    proposal.status !== "in_production"
+  ) {
+    throw new Error("Į gamybą galima perkelti tik patvirtintą pasiūlymą.");
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(proposals)
+    .set({ status, updatedAt: now })
+    .where(eq(proposals.id, proposalId));
+
+  const [row] = await db
+    .select()
+    .from(proposals)
+    .where(eq(proposals.id, proposalId))
+    .limit(1);
+  if (!row) throw new Error("Pasiūlymas nerastas.");
+  return row;
+}
+
+export async function deleteProposal(proposalId: string): Promise<void> {
+  const proposal = await getProposalById(proposalId);
+  if (!proposal) throw new Error("Pasiūlymas nerastas.");
+
+  await db.delete(jobs).where(eq(jobs.proposalId, proposalId));
+  await db.delete(proposals).where(eq(proposals.id, proposalId));
 }
 
 export async function confirmProposal(proposalId: string): Promise<number> {

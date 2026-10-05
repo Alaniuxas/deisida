@@ -118,13 +118,14 @@ export function plannerFridayMidnight(now = new Date()): Date {
 }
 
 /**
- * After Friday 00:00 Vilnius, the locked UI week is the following
- * Monday 00:00 through Sunday 24:00 (inclusive dates Mon–Sun).
+ * After Friday 00:00 Vilnius, the locked plan covers the following
+ * production week Mon–Fri (pjovimo pradžios iki penktadienio vakaro).
+ * Pabaiga gali persikelti į kitą savaitę (valandinis pjovimo grafikas).
  */
 export function lockedWeekAfterFriday(friday: Date): LockedWeek {
   const fridayIso = vilniusDateIso(friday);
   const startIso = addCalendarDays(fridayIso, 3);
-  const endIso = addCalendarDays(startIso, 6);
+  const endIso = addCalendarDays(startIso, 4);
   return { startIso, endIso };
 }
 
@@ -146,8 +147,32 @@ export function isTimestampInLockedWeek(
   return isDateInLockedWeek(vilniusDateIso(date), week);
 }
 
+function isWeekendDate(date: Date): boolean {
+  const weekday = WEEKDAY_TO_INDEX[zoneParts(date).weekday] ?? 0;
+  return weekday === 0 || weekday === 6;
+}
+
+/** Ar darbo pradžia patenka į užrakintą gamybos savaitę (pr–pn, ne savaitgalis). */
+export function isJobStartInLockedPlanWeek(
+  value: Date | string,
+  week: LockedWeek,
+): boolean {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  if (!isDateInLockedWeek(vilniusDateIso(date), week)) {
+    return false;
+  }
+  return !isWeekendDate(date);
+}
+
 export function formatLockedWeekLabel(week: LockedWeek): string {
   const start = week.startIso.split("-").reverse().join(".");
   const end = week.endIso.split("-").reverse().join(".");
   return `${start} – ${end}`;
+}
+
+/** Paskutinė užrakintos savaitės darbo diena (pn) 17:00 Europe/Vilnius. */
+export function lockedWeekFridayEnd(week: LockedWeek): Date {
+  const [year, month, day] = week.endIso.split("-").map(Number);
+  return zonedTimeToUtc(year, month, day, 17, 0);
 }

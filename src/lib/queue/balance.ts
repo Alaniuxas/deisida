@@ -1,5 +1,22 @@
+import {
+  canKeepWideJobOnNarrowLane,
+  pickBestMachineForJob,
+  pickChangeoverFallbackMachine,
+  pickNearestMachineByStep,
+  isJobEligibleForMachine,
+} from "./assign-job";
 import { DEFAULT_CHANGEOVER_MINUTES, SHIFT_HOURS } from "./constants";
-import { addWorkDuration, snapToWorkStart, WORK_HOURS_PER_DAY, WORK_START_HOUR } from "./work-hours";
+import {
+  changeoverHoursFromSetup,
+  nextSetupWidthAfterJob,
+} from "./machine-width";
+import { orderJobsByP1P2P3 } from "./width-order";
+import {
+  addWorkDuration,
+  snapToWorkStart,
+  WORK_END_HOUR,
+  WORK_START_HOUR,
+} from "./work-hours";
 import type { LockedWeek } from "./week";
 import { addCalendarDays, vilniusDateIso, zonedTimeToUtc } from "./week";
 import type { Machine, PickCriterion, QueueJob } from "./types";
@@ -28,8 +45,6 @@ export function plannerReferenceTime(now: Date, lockedWeek: LockedWeek): Date {
   return now.getTime() < weekStart.getTime() ? weekStart : snapToWorkStart(now);
 }
 
-const HOURS_PER_DAY = 24;
-
 function storedWidthOrUnknown(storedWidthMm: number): number | null {
   return storedWidthMm > 0 ? storedWidthMm : null;
 }
@@ -38,57 +53,60 @@ function magnetWidth(machine: BalancedMachineState): number | null {
   return storedWidthOrUnknown(machine.plannedWidthMm ?? machine.currentWidthMm);
 }
 
-function widthDistance(machine: BalancedMachineState, jobWidthMm: number): number {
-  const width = magnetWidth(machine);
-  return width == null ? Number.POSITIVE_INFINITY : Math.abs(width - jobWidthMm);
+function productionHoursForJob(
+  job: QueueJob,
+  machine: BalancedMachineState,
+): number {
+  const piecesPerDay = machine.piecesPerDay ?? 0;
+  if (piecesPerDay > 0 && job.pieceCount > 0) {
+    return (job.pieceCount / piecesPerDay) * SHIFT_HOURS;
+  }
+  return (job.quantityPallets / Math.max(machine.dailyRatePieces, 1)) * SHIFT_HOURS;
 }
 
-function estimateJobHours(job: QueueJob, machine: BalancedMachineState): number {
-  const plannedWidthMm = magnetWidth(machine);
-  const piecesPerDay = machine.piecesPerDay ?? 0;
-  const productionHours =
-    piecesPerDay > 0 && job.pieceCount > 0
-      ? (job.pieceCount / piecesPerDay) * SHIFT_HOURS
-      : (job.quantityPallets / Math.max(machine.dailyRatePieces, 1)) * HOURS_PER_DAY;
-  const changeoverHours =
-    plannedWidthMm != null &&
-    plannedWidthMm > 0 &&
-    plannedWidthMm === job.tileWidthMm
-      ? 0
-      : DEFAULT_CHANGEOVER_MINUTES / 60;
-  return productionHours + changeoverHours;
+/** Productive hours for one job given the lane's current sequential setup. */
+export function estimateJobHours(
+  job: QueueJob,
+  machine: BalancedMachineState,
+  setupWidthMm: number,
+): number {
+  return (
+    productionHoursForJob(job, machine) +
+    changeoverHoursFromSetup(
+      setupWidthMm,
+      job.tileWidthMm,
+      DEFAULT_CHANGEOVER_MINUTES,
+    )
+  );
 }
 
 function machineLoadHours(machine: BalancedMachineState): number {
-  return machine.assignedJobs.reduce(
-    (sum, job) => sum + estimateJobHours(job, machine),
+  const magnet = magnetWidth(machine) ?? 0;
+  const ordered = orderJobsByP1P2P3(
+    machine.assignedJobs,
+    magnet,
     0,
+    (job) => job.tileWidthMm,
+    (job) => job.storisMm,
+    (job) => job.deadline,
+    (job) => job.proposalId,
+    (job) => job.pieceCount,
   );
+  let setup = magnet;
+  let total = 0;
+  for (const job of ordered) {
+    total += estimateJobHours(job, machine, setup);
+    setup = nextSetupWidthAfterJob(setup, job.tileWidthMm);
+  }
+  return total;
 }
 
 function isEligibleForJob(
   machine: BalancedMachineState,
   job: QueueJob,
-  preferredMachineId: string | undefined,
+  _preferredMachineId: string | undefined,
 ): boolean {
-  if (machine.id === preferredMachineId) {
-    return true;
-  }
-
-  const width = magnetWidth(machine);
-  if (width == null) {
-    return true;
-  }
-
-  if (Math.abs(width - job.tileWidthMm) <= 2) {
-    return true;
-  }
-
-  if (machine.assignedJobs.length === 0) {
-    return true;
-  }
-
-  return false;
+  return isJobEligibleForMachine(machine, job);
 }
 
 export function assignJobsWithLoadBalance(
@@ -102,35 +120,53 @@ export function assignJobsWithLoadBalance(
 
   for (const job of sortedJobs) {
     const preferredMachineId = widthAssignment.get(job.tileWidthMm)?.machineId;
-    const eligible = machineStates.filter((machine) =>
-      isEligibleForJob(machine, job, preferredMachineId),
-    );
-    const candidates = eligible.length > 0 ? eligible : machineStates;
-
-    candidates.sort((left, right) => {
-      const preferredLeft = left.id === preferredMachineId ? 0 : 1;
-      const preferredRight = right.id === preferredMachineId ? 0 : 1;
-      if (preferredLeft !== preferredRight) {
-        return preferredLeft - preferredRight;
+    const withLoad = machineStates.map((machine) => ({
+      ...machine,
+      loadHours: machineLoadHours(machine),
+    }));
+    if (job.pinnedMachineId) {
+      const pinned = withLoad.find(
+        (machine) => machine.id === job.pinnedMachineId,
+      );
+      if (pinned) {
+        pinned.assignedJobs.push(job);
+        continue;
       }
-
-      const loadGap = machineLoadHours(left) - machineLoadHours(right);
-      if (loadGap !== 0) {
-        return loadGap;
-      }
-
-      const widthGap =
-        widthDistance(left, job.tileWidthMm) - widthDistance(right, job.tileWidthMm);
-      if (widthGap !== 0) {
-        return widthGap;
-      }
-
-      return left.id.localeCompare(right.id);
-    });
-
-    const target = candidates[0] ?? machineStates[0];
+    }
+    const preferredLastResort =
+      preferredMachineId != null
+        ? withLoad.find(
+            (machine) =>
+              machine.id === preferredMachineId &&
+              canKeepWideJobOnNarrowLane(machine, job),
+          )
+        : undefined;
+    const target =
+      pickBestMachineForJob(withLoad, job, preferredMachineId) ??
+      withLoad
+        .filter((machine) => isEligibleForJob(machine, job, preferredMachineId))
+        .sort(
+          (left, right) =>
+            machineLoadHours(left) - machineLoadHours(right) ||
+            left.id.localeCompare(right.id),
+        )[0] ??
+      pickChangeoverFallbackMachine(withLoad, job) ??
+      pickNearestMachineByStep(withLoad, job) ??
+      preferredLastResort;
+    if (!target) {
+      continue;
+    }
     target.assignedJobs.push(job);
   }
+}
+
+const MIN_LOAD_GAP_HOURS = 2;
+
+function isReceiverEligibleForRebalance(
+  receiver: BalancedMachineState,
+  job: QueueJob,
+): boolean {
+  return isEligibleForJob(receiver, job, undefined);
 }
 
 export function rebalanceEmptyMachines(machineStates: BalancedMachineState[]): void {
@@ -170,11 +206,51 @@ export function rebalanceEmptyMachines(machineStates: BalancedMachineState[]): v
 
       donor.assignedJobs = donor.assignedJobs.filter((candidate) => candidate.id !== job.id);
       receiver.assignedJobs.push(job);
+      if (receiver.plannedWidthMm == null) {
+        receiver.plannedWidthMm = job.tileWidthMm;
+      }
       moved = true;
     }
 
     if (!moved) {
       break;
+    }
+  }
+}
+
+/** Perkelia darbus iš perkrautų staklių į mažiau apkrautas (±5 mm, valandų balansas). */
+export function rebalanceMachineLoads(machineStates: BalancedMachineState[]): void {
+  rebalanceEmptyMachines(machineStates);
+
+  if (machineStates.length <= 1) {
+    return;
+  }
+
+  for (let pass = 0; pass < machineStates.length * 24; pass += 1) {
+    const ranked = [...machineStates].sort(
+      (left, right) => machineLoadHours(right) - machineLoadHours(left),
+    );
+    const donor = ranked[0];
+    const receiver = ranked[ranked.length - 1];
+    const loadGap = machineLoadHours(donor) - machineLoadHours(receiver);
+
+    if (loadGap < MIN_LOAD_GAP_HOURS) {
+      break;
+    }
+
+    const movable = [...donor.assignedJobs]
+      .filter((job) => isReceiverEligibleForRebalance(receiver, job))
+      .sort((left, right) => compareDeadlines(right.deadline, left.deadline));
+
+    const job = movable[0];
+    if (!job) {
+      break;
+    }
+
+    donor.assignedJobs = donor.assignedJobs.filter((candidate) => candidate.id !== job.id);
+    receiver.assignedJobs.push(job);
+    if (receiver.plannedWidthMm == null) {
+      receiver.plannedWidthMm = job.tileWidthMm;
     }
   }
 }
@@ -217,7 +293,8 @@ export function recordSpreadHours(
   for (let day = 0; day < 5; day += 1) {
     const dayIso = addCalendarDays(lockedWeek.startIso, day);
     const dayStart = workdayStart(lockedWeek, day);
-    const dayEnd = new Date(dayStart.getTime() + WORK_HOURS_PER_DAY * 60 * 60 * 1000);
+    const [year, month, dayOfMonth] = dayIso.split("-").map(Number);
+    const dayEnd = zonedTimeToUtc(year, month, dayOfMonth, WORK_END_HOUR, 0);
     const overlapStart = Math.max(start.getTime(), dayStart.getTime());
     const overlapEnd = Math.min(end.getTime(), dayEnd.getTime());
     if (overlapEnd > overlapStart) {

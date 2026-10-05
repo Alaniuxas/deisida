@@ -16,6 +16,10 @@ export async function PATCH(
         body.dailyRatePallets !== undefined
           ? Number(body.dailyRatePallets)
           : undefined,
+      workNormPiecesPerDay:
+        body.workNormPiecesPerDay !== undefined
+          ? Number(body.workNormPiecesPerDay)
+          : undefined,
       rotationHours:
         body.rotationHours !== undefined
           ? Number(body.rotationHours)

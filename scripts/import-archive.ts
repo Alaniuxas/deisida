@@ -108,7 +108,61 @@ async function importUsers(passwordHash: string): Promise<number> {
   return count;
 }
 
-async function importTiles(): Promise<number> {
+function formatDiscLabelFromRow(row: {
+  name: string;
+  diameterMm: number | null;
+  workId: string | null;
+}): string {
+  const parts = [row.name];
+  if (row.diameterMm) parts.push(`Ø${row.diameterMm} mm`);
+  if (row.workId) parts.push(row.workId);
+  return parts.join(" · ");
+}
+
+async function importDiscs(): Promise<number> {
+  const rows = readCsv("export_All-Discs-modified_2026-09-28_08-26-58.csv");
+  let count = 0;
+
+  for (const row of rows) {
+    const title = row.title?.trim();
+    const id = row["unique id"]?.trim();
+    if (!title || !id) continue;
+
+    const diameterMm = toInt(row.diameter);
+    const thicknessMm = toInt(row.thickness);
+    const priceEur = toFloat(row.price);
+
+    await db
+      .insert(discs)
+      .values({
+        id,
+        name: title,
+        description: row.description?.trim() || null,
+        diameterMm: diameterMm > 0 ? diameterMm : null,
+        thicknessMm: thicknessMm > 0 ? thicknessMm : null,
+        supplier: row.supplier?.trim() || "",
+        priceEur: priceEur > 0 ? priceEur : null,
+        workId: row["work-id"]?.trim() || null,
+      })
+      .onConflictDoUpdate({
+        target: discs.id,
+        set: {
+          name: title,
+          description: row.description?.trim() || null,
+          diameterMm: diameterMm > 0 ? diameterMm : null,
+          thicknessMm: thicknessMm > 0 ? thicknessMm : null,
+          supplier: row.supplier?.trim() || "",
+          priceEur: priceEur > 0 ? priceEur : null,
+          workId: row["work-id"]?.trim() || null,
+        },
+      });
+    count += 1;
+  }
+
+  return count;
+}
+
+async function importTiles(discLabelById: Map<string, string>): Promise<number> {
   const rows = readCsv("export_All-Bricks-modified_2026-09-28_08-25-38.csv");
   let count = 0;
 
@@ -118,6 +172,8 @@ async function importTiles(): Promise<number> {
 
     const height = toInt(row.height);
     const id = slugify(title) || row["unique id"];
+    const discId = row.disc?.trim() || null;
+    const discLabel = discId ? discLabelById.get(discId) ?? null : null;
 
     await db
       .insert(tiles)
@@ -134,7 +190,8 @@ async function importTiles(): Promise<number> {
         heightMm: height,
         defaultStorisMm: height,
         description: row.description?.trim() || "",
-        disc: row.disc?.trim() || null,
+        discId,
+        disc: discLabel,
         hardness: row.hardness ? toInt(row.hardness) : null,
         fragilityStrip: toPercent(row.fragility_stripe),
         fragilityCorner: toPercent(row.fragility_corner),
@@ -152,7 +209,8 @@ async function importTiles(): Promise<number> {
           heightMm: height,
           defaultStorisMm: height,
           description: row.description?.trim() || "",
-          disc: row.disc?.trim() || null,
+          discId,
+          disc: discLabel,
           hardness: row.hardness ? toInt(row.hardness) : null,
           fragilityStrip: toPercent(row.fragility_stripe),
           fragilityCorner: toPercent(row.fragility_corner),
@@ -221,7 +279,19 @@ async function main(): Promise<void> {
   await clearTables();
 
   const importedUsers = await importUsers(passwordHash);
-  const importedTiles = await importTiles();
+  const importedDiscs = await importDiscs();
+  const discRows = await db.select().from(discs);
+  const discLabelById = new Map(
+    discRows.map((row) => [
+      row.id,
+      formatDiscLabelFromRow({
+        name: row.name,
+        diameterMm: row.diameterMm,
+        workId: row.workId,
+      }),
+    ]),
+  );
+  const importedTiles = await importTiles(discLabelById);
   const importedClients = await importClients();
   const importedMachines = await importMachines();
   const { importCuttingNorms } = await import("../src/lib/queue/excel-norms");
@@ -235,7 +305,7 @@ async function main(): Promise<void> {
         clients: importedClients,
         machines: importedMachines,
         cutting,
-        discs: 0,
+        discs: importedDiscs,
         password: STARTER_PASSWORD,
       },
       null,

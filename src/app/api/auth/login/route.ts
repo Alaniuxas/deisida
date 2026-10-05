@@ -1,18 +1,10 @@
-import { NextResponse } from "next/server";
 import { loginUser, type UserRole } from "@/lib/auth";
 import { handleApiError, jsonError, jsonOk } from "@/lib/api";
+import { redirectToPath } from "@/lib/request-url";
 
 function defaultPathForRole(role: UserRole): string {
   if (role === "cechas") return "/cechas";
   return "/pasiulymai";
-}
-
-/** 303 with a relative Location — safe behind Cloudflare (never 0.0.0.0:43127). */
-function redirectToPath(path: string): NextResponse {
-  return new NextResponse(null, {
-    status: 303,
-    headers: { Location: path },
-  });
 }
 
 async function parseCredentials(request: Request): Promise<{
@@ -48,7 +40,9 @@ export async function POST(request: Request) {
 
     if (!email || !password) {
       if (isFormPost) {
-        return redirectToPath("/prisijungti?error=empty");
+        const query = new URLSearchParams({ error: "empty", mode: "email" });
+        if (next) query.set("next", next);
+        return redirectToPath(`/prisijungti?${query.toString()}`);
       }
       return jsonError("Įveskite el. paštą ir slaptažodį.");
     }
@@ -56,7 +50,12 @@ export async function POST(request: Request) {
     const user = await loginUser(email, password);
     if (!user) {
       if (isFormPost) {
-        const query = new URLSearchParams({ error: "invalid", email });
+        const query = new URLSearchParams({
+          error: "invalid",
+          email,
+          mode: "email",
+        });
+        if (next) query.set("next", next);
         return redirectToPath(`/prisijungti?${query.toString()}`);
       }
       return jsonError("Neteisingi prisijungimo duomenys.", 401);

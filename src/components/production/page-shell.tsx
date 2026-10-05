@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 interface PageShellProps {
@@ -25,25 +24,6 @@ export function PageShell({
             wide ? "max-w-6xl" : "max-w-3xl",
           )}
         >
-          <div className="flex items-center justify-between gap-4">
-            <Link
-              href="/"
-              className="text-sm font-semibold tracking-tight text-deisida"
-            >
-              Deisida
-            </Link>
-            <nav className="flex gap-3 text-sm text-muted-foreground">
-              <Link href="/cechas" className="hover:text-foreground">
-                Cechas
-              </Link>
-              <Link href="/eile" className="hover:text-foreground">
-                Eilė
-              </Link>
-              <Link href="/admin/konvejeriai" className="hover:text-foreground">
-                Admin
-              </Link>
-            </nav>
-          </div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
             {title}
           </h1>

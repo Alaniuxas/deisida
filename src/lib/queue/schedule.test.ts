@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { isTimestampInLockedWeek, zonedTimeToUtc } from "./week";
-import { pickMachine, scheduleQueue, sortJobsForMachine } from "./schedule";
+import {
+  pickMachine,
+  scheduleQueue,
+  sortJobsForMachine,
+  recalculateLaneAssignments,
+  jobPriority,
+} from "./schedule";
 import { isWithinWorkHours } from "./work-hours";
 import type { Machine, QueueJob } from "./types";
 
@@ -8,7 +14,7 @@ function vilnius(year: number, month: number, day: number, hour = 8, minute = 0)
   return zonedTimeToUtc(year, month, day, hour, minute);
 }
 
-const LOCKED_WEEK = { startIso: "2026-10-05", endIso: "2026-10-11" };
+const LOCKED_WEEK = { startIso: "2026-10-05", endIso: "2026-10-09" };
 
 function makeJob(
   id: string,
@@ -52,18 +58,27 @@ function plannerMachine(
   id: string,
   currentWidthMm: number,
   dailyRatePieces = 240,
+  piecesPerDay?: number,
 ): Machine {
   return {
     id,
     currentWidthMm,
     dailyRatePieces,
     changeoverMinutes: 30,
-    piecesPerDay: dailyRatePieces === 720 ? 8000 : 2500,
+    piecesPerDay: piecesPerDay ?? (dailyRatePieces === 720 ? 8000 : 2500),
   };
 }
 
+describe("jobPriority", () => {
+  it("labels first job P1 when machine width already matches", () => {
+    const job = { tileWidthMm: 14, storisMm: 52 };
+    expect(jobPriority(job, null, 14)).toBe("P1");
+    expect(jobPriority(job, job, 14)).toBe("P1");
+  });
+});
+
 describe("sortJobsForMachine", () => {
-  it("orders exact width first, then P3 jobs by deadline", () => {
+  it("orders exact width first, then P3 by smallest width step", () => {
     const jobs = [
       makeJob("exact", 100),
       makeJob("far", 10, "2026-10-20"),
@@ -86,7 +101,7 @@ describe("sortJobsForMachine", () => {
     expect(ordered.map((job) => job.id)).toEqual(["p1", "p2"]);
   });
 
-  it("orders P3 jobs by deadline, not width proximity", () => {
+  it("orders P3 by smallest width step, then deadline when tied", () => {
     const jobs = [
       makeJob("later", 110, "2026-10-20"),
       makeJob("sooner", 90, "2026-10-10"),
@@ -97,7 +112,7 @@ describe("sortJobsForMachine", () => {
     expect(ordered.map((job) => job.id)).toEqual(["sooner", "later"]);
   });
 
-  it("does not put far-future P3 ahead of nearer-deadline P3 on the same machine", () => {
+  it("minimizes width steps on P3 even when a far deadline is closer in mm", () => {
     const jobs = [
       makeJob("december", 108, "2026-12-31"),
       makeJob("urgent", 50, "2026-10-08"),
@@ -106,7 +121,7 @@ describe("sortJobsForMachine", () => {
 
     const ordered = sortJobsForMachine(jobs, 100);
 
-    expect(ordered.map((job) => job.id)).toEqual(["urgent", "soon", "december"]);
+    expect(ordered.map((job) => job.id)).toEqual(["december", "soon", "urgent"]);
   });
 });
 
@@ -152,7 +167,7 @@ describe("scheduleQueue P1/P2 clustering", () => {
     expect(byJob.far).toBe("SK1");
   });
 
-  it("does not steal 101 mm onto an empty machine just because the 100 mm queue is long", () => {
+  it("balances 101 mm onto idle SK1 when NK1 is overloaded", () => {
     const assignments = scheduleQueue(
       [plannerMachine("SK1", 0), plannerMachine("NK1", 100, 720)],
       [
@@ -166,7 +181,7 @@ describe("scheduleQueue P1/P2 clustering", () => {
     );
 
     expect(byJob.long).toBe("NK1");
-    expect(byJob.next).toBe("NK1");
+    expect(byJob.next).toBe("SK1");
   });
 
   it("both idle: 101 mm to higher-rate NK1, 10 mm to SK1 (farthest)", () => {
@@ -201,7 +216,7 @@ describe("scheduleQueue P1/P2 clustering", () => {
       [
         makeJob("far", 10, "2026-10-12"),
         makeJob("exact", 100, "2026-10-11"),
-        makeJob("near", 108, "2026-10-10"),
+        makeJob("near", 103, "2026-10-10"),
       ],
     );
 
@@ -212,11 +227,90 @@ describe("scheduleQueue P1/P2 clustering", () => {
           left.estimatedStart.getTime() - right.estimatedStart.getTime(),
       );
 
+    // 10 mm arčiau SK1@100 (90 mm) nei NK1@200 (190 mm) — prioritetas mažiausias žingsnis, ne „nepriskirti“
     expect(sk1.map((assignment) => assignment.jobId)).toEqual([
       "exact",
       "near",
       "far",
     ]);
+  });
+
+  it("sequences tiny jobs one after another on the same lane", () => {
+    const machine = plannerMachine("NK1", 14, 720, 8000);
+    const start = new Date("2026-10-07T12:34:00.000Z");
+    const base = {
+      machineId: "NK1",
+      proposalId: "p1",
+      cutType: "pjovimas",
+      tileWidthMm: 14,
+      storisMm: 52,
+      quantityPallets: 1,
+      changeoverHours: 0,
+      pickCriterion: "p1" as const,
+      pickStartHours: 0,
+      otherMachineId: null,
+      otherStartHours: null,
+      priority: "P1" as const,
+    };
+
+    const recalculated = recalculateLaneAssignments(
+      [
+        {
+          job: { pieceCount: 5, widthMm: 14, status: "queued" },
+          assignment: {
+            ...base,
+            jobId: "a",
+            durationHours: 0.1,
+            estimatedStart: start,
+            estimatedEnd: start,
+          },
+        },
+        {
+          job: { pieceCount: 1, widthMm: 14, status: "queued" },
+          assignment: {
+            ...base,
+            jobId: "b",
+            durationHours: 0.1,
+            estimatedStart: start,
+            estimatedEnd: start,
+          },
+        },
+      ],
+      machine,
+    );
+
+    expect(recalculated[0]?.estimatedEnd.getTime()).toBeLessThanOrEqual(
+      recalculated[1]?.estimatedStart.getTime() ?? 0,
+    );
+    expect(recalculated[0]?.estimatedEnd.getTime()).toBeGreaterThan(
+      recalculated[0]?.estimatedStart.getTime() ?? 0,
+    );
+  });
+
+  it("cuts matching queue width before wider jobs when machine width is unset", () => {
+    const assignments = scheduleQueue(
+      [plannerMachine("S4", 115, 240)],
+      [
+        makeJob("wide-early", 120, "2026-10-10"),
+        makeJob("match", 113, "2026-10-23"),
+      ],
+      {
+        referenceTime: vilnius(2026, 10, 5, 8, 0),
+        lockedWeek: LOCKED_WEEK,
+        balanceLockedWeek: false,
+      },
+    );
+
+    const s4 = assignments
+      .filter((assignment) => assignment.machineId === "S4")
+      .sort(
+        (left, right) =>
+          left.estimatedStart.getTime() - right.estimatedStart.getTime(),
+      );
+
+    expect(s4.map((assignment) => assignment.jobId)).toEqual(["match", "wide-early"]);
+    expect(s4[0]?.changeoverHours).toBe(0);
+    expect(s4[1]?.changeoverHours).toBe(0);
   });
 });
 
@@ -255,17 +349,39 @@ describe("scheduleQueue load balancing", () => {
     expect(machinesUsed.size).toBeGreaterThanOrEqual(4);
   });
 
-  it("does not schedule far-future P3 first on NK1 when balancing locked week", () => {
+  it("keeps job counts closer across six machines for larger queues", () => {
+    const jobs = Array.from({ length: 24 }, (_, index) =>
+      makeJob(`load-${index}`, 50 + (index % 8) * 5, `2026-10-${8 + (index % 5)}`),
+    );
+
+    const assignments = scheduleQueue(sixMachines, jobs, {
+      referenceTime: new Date("2026-10-05T05:00:00.000Z"),
+      lockedWeek: LOCKED_WEEK,
+      balanceLockedWeek: true,
+    });
+
+    const counts = Object.fromEntries(
+      sixMachines.map((machine) => [
+        machine.id,
+        assignments.filter((assignment) => assignment.machineId === machine.id).length,
+      ]),
+    );
+    const values = Object.values(counts).filter((count) => count > 0);
+    expect(values.length).toBeGreaterThanOrEqual(4);
+    expect(Math.max(...values) - Math.min(...values)).toBeLessThanOrEqual(12);
+  });
+
+  it("orders P3 on NK1 by smallest width step from setup", () => {
     const assignments = scheduleQueue(
       [plannerMachine("NK1", 100, 720)],
       [
-        makeJob("december", 108, "2026-12-31"),
-        makeJob("urgent", 90, "2026-10-08"),
+        makeJob("december", 104, "2026-12-31"),
+        makeJob("urgent", 95, "2026-10-08"),
       ],
       {
         referenceTime: new Date("2026-10-05T05:00:00.000Z"),
         lockedWeek: LOCKED_WEEK,
-        balanceLockedWeek: true,
+        balanceLockedWeek: false,
       },
     );
 
@@ -276,8 +392,7 @@ describe("scheduleQueue load balancing", () => {
           left.estimatedStart.getTime() - right.estimatedStart.getTime(),
       );
 
-    expect(nk1.map((assignment) => assignment.jobId)).toEqual(["urgent", "december"]);
-    expect(nk1[0]?.jobId).not.toBe("december");
+    expect(nk1.map((assignment) => assignment.jobId)).toEqual(["december", "urgent"]);
   });
 });
 
@@ -343,12 +458,73 @@ describe("scheduleQueue locked-week timing", () => {
     }
   });
 
-  it("spreads workload across Mon–Fri instead of dumping on one day", () => {
-    const jobs = Array.from({ length: 30 }, (_, index) =>
-      makeJob(`spread-${index}`, 90 + (index % 6), `2026-10-${10 + index}`),
+  it("keeps w51 on S2 (51 mm) after load balance, not NK1 (14 mm)", () => {
+    const machines: Machine[] = [
+      plannerMachine("NK1", 14, 720),
+      plannerMachine("NK2", 10, 720),
+      plannerMachine("S1", 50, 240),
+      plannerMachine("S2", 51, 240),
+      plannerMachine("S4", 20, 240),
+      plannerMachine("SK1", 40, 240),
+    ];
+    const jobs = Array.from({ length: 24 }, (_, index) =>
+      makeJob(`load-${index}`, 50 + (index % 8) * 5, `2026-10-${8 + (index % 5)}`),
+    );
+    jobs.push(makeJob("w51-a", 51, "2026-10-10"));
+    jobs.push(makeJob("w51-b", 51, "2026-10-11"));
+
+    const assignments = scheduleQueue(machines, jobs, {
+      referenceTime: vilnius(2026, 10, 5, 8, 0),
+      lockedWeek: LOCKED_WEEK,
+      balanceLockedWeek: true,
+    });
+
+    for (const jobId of ["w51-a", "w51-b"]) {
+      const assignment = assignments.find((row) => row.jobId === jobId);
+      expect(["S1", "S2"]).toContain(assignment?.machineId);
+      expect(assignment?.machineId).not.toBe("NK1");
+      expect(assignment?.changeoverHours).toBe(0);
+    }
+  });
+
+  it("starts each machine's first locked-week job on Monday 08:00 Vilnius", () => {
+    const jobs = Array.from({ length: 18 }, (_, index) =>
+      makeJob(`mon-${index}`, 90 + (index % 6), `2026-10-${10 + index}`),
     );
 
     const assignments = scheduleQueue(sixMachines, jobs, {
+      referenceTime: vilnius(2026, 10, 2, 12, 0),
+      lockedWeek: LOCKED_WEEK,
+      balanceLockedWeek: true,
+    });
+
+    for (const machine of sixMachines) {
+      const lane = assignmentsForMachine(assignments, machine.id).filter((assignment) =>
+        isTimestampInLockedWeek(assignment.estimatedStart, LOCKED_WEEK),
+      );
+      if (lane.length === 0) continue;
+      expect(
+        lane[0].estimatedStart.toLocaleDateString("en-CA", {
+          timeZone: "Europe/Vilnius",
+        }),
+      ).toBe("2026-10-05");
+    }
+  });
+
+  it("chains long queues into later weekdays after Monday start", () => {
+    const jobs = Array.from({ length: 8 }, (_, index) =>
+      makeJob(
+        `spread-${index}`,
+        100,
+        `2026-10-${10 + index}`,
+        `p-${index}`,
+        20,
+        20,
+        8000,
+      ),
+    );
+
+    const assignments = scheduleQueue([plannerMachine("NK1", 100, 720)], jobs, {
       referenceTime: vilnius(2026, 10, 5, 8, 0),
       lockedWeek: LOCKED_WEEK,
       balanceLockedWeek: true,
@@ -366,7 +542,12 @@ describe("scheduleQueue locked-week timing", () => {
         ),
     );
 
-    expect(lockedDays.size).toBeGreaterThanOrEqual(3);
+    expect(lockedDays.size).toBeGreaterThanOrEqual(2);
+    expect(
+      assignments[0]?.estimatedStart.toLocaleDateString("en-CA", {
+        timeZone: "Europe/Vilnius",
+      }),
+    ).toBe("2026-10-05");
   });
 
   it("marks only jobs starting in the locked week as locked", () => {

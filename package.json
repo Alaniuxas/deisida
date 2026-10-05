@@ -3,17 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 43127 --hostname 0.0.0.0",
+    "dev": "next dev --port 43127 --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "db:import": "tsx scripts/import-archive.ts",
+    "db:import-discs": "tsx scripts/import-discs-from-archive.ts",
+    "db:resolve-discs": "tsx scripts/resolve-tile-discs.ts",
     "db:norms": "tsx scripts/import-cutting-norms.ts",
     "db:cutting-norms": "tsx scripts/import-cutting-norms.ts",
     "db:seed-rotation": "tsx scripts/seed-rotation-demo.ts",
+    "db:seed-worker-pin": "tsx scripts/seed-worker-pin.ts",
     "queue:plan": "tsx scripts/run-queue-plan.ts",
-    "db:seed-queue": "tsx scripts/seed-queue-from-archive.ts"
+    "queue:audit": "tsx scripts/audit-queue.ts",
+    "db:seed-queue": "tsx scripts/seed-queue-from-archive.ts",
+    "db:seed-stress": "tsx scripts/seed-stress-queue.ts",
+    "db:fix-quantities": "tsx scripts/fix-tiny-job-quantities.ts",
+    "db:seed-widths": "tsx scripts/seed-machine-widths.ts",
+    "db:seed-quick-proposal": "tsx scripts/seed-quick-proposal.ts",
+    "db:seed-changeover": "tsx scripts/seed-changeover-demo.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.71",

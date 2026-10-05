@@ -1,5 +1,10 @@
 import { requireUser } from "@/lib/auth";
-import { getProposalById, proposalToForm, saveProposal } from "@/lib/db/proposals";
+import {
+  deleteProposal,
+  getProposalById,
+  proposalToForm,
+  saveProposal,
+} from "@/lib/db/proposals";
 import type { Proposal } from "@/lib/types";
 import { handleApiError, jsonError, jsonOk } from "@/lib/api";
 
@@ -39,6 +44,20 @@ export async function PATCH(
     });
 
     return jsonOk({ proposal: saved });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    await requireUser(["admin", "pardavimai"]);
+    const { id } = await context.params;
+    await deleteProposal(id);
+    return jsonOk({ deleted: true });
   } catch (error) {
     return handleApiError(error);
   }

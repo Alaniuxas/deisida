@@ -1,4 +1,5 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { cache } from "react";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   jobs,
@@ -9,31 +10,51 @@ import {
   users,
   palletLogs,
   alerts,
+  queueOverrides,
+  queuePlanItems,
   type JobRow,
 } from "@/lib/db/schema";
+import {
+  expectedPiecesPerPallet,
+  requiresUnderPlanComment,
+} from "@/lib/queue/actual-pace";
+import { rescheduleRemainingWeek } from "@/lib/queue/live-reschedule";
 import {
   getRotationsAdminData,
   getActiveRotationMachineId,
 } from "@/lib/queue/rotations";
 import { resolveShopCode, sortShopCodes } from "@/lib/queue/shop-code";
-import { ensureCuttingNorms, ensureShopMachines } from "@/lib/queue/excel-norms";
-import { ensureWorkNorms, getWorkNorms } from "@/lib/queue/work-norms";
-import { scheduleQueue } from "@/lib/queue/schedule";
-import { orderJobsByP1P2P3 } from "@/lib/queue/width-order";
+import { getWorkNorms } from "@/lib/queue/work-norms";
 import {
-  getLatestPlanRun,
-  getPlanItemsForRun,
-} from "@/lib/queue/plan";
-import { isTimestampInLockedWeek, type LockedWeek } from "@/lib/queue/week";
+  scheduleQueue,
+  recalculateLaneAssignments,
+  jobPriority,
+} from "@/lib/queue/schedule";
+import { getLatestPlanRun } from "@/lib/queue/plan";
+import {
+  alignAiCommentsWithRebalance,
+  analyzeRebalanceState,
+  type RebalanceState,
+} from "@/lib/queue/rebalance";
+import { orderLaneJobsForDisplay } from "@/lib/queue/display-order";
+import type { QueuePlanItemRow } from "@/lib/db/schema";
+import {
+  isJobStartInLockedPlanWeek,
+  type LockedWeek,
+} from "@/lib/queue/week";
 import type { Machine as PlannerMachine, QueueJob as PlannerJob } from "@/lib/queue/types";
 import {
   DEFAULT_CHANGEOVER_MINUTES,
   DEFAULT_ROTATION_HOURS,
+  SHOP_MACHINE_ORDER,
 } from "@/lib/queue/constants";
 import {
+  changeoverHoursFromSetup,
   getEffectiveMachineWidth,
   machineWidthHint,
+  nextSetupWidthAfterJob,
 } from "@/lib/queue/machine-width";
+import { advanceWorkHours, durationHoursFromPlan } from "@/lib/queue/work-hours";
 import type {
   QueueResponse,
   QueueWidthGroup,
@@ -75,6 +96,10 @@ interface BuiltSchedule {
   aiComments: string[];
   aiSource: "claude" | "mock" | null;
   planRunId: string | null;
+  planStatus: "ready" | "accepted" | null;
+  planItemByJob: Map<string, QueuePlanItemRow>;
+  moveReasonByJob: Map<string, string>;
+  rebalanceState: RebalanceState | null;
 }
 
 function sanitizeAiComments(
@@ -218,10 +243,17 @@ function buildAssignmentReason(
     return `Tuščios ${thisCode} gavo tolimiausią bloką nuo ${otherCode} (${job.widthMm} mm), ne kaimyninį mm.`;
   }
   if (assignment.pickCriterion === "width" && otherCode) {
-    return `Priskirta ${thisCode}: arčiau planinio pločio nei ${otherCode} (${job.widthMm} mm).`;
+    const setupMm = machine.currentWidthMm && machine.currentWidthMm > 0
+      ? `${machine.currentWidthMm} mm`
+      : "pagal eilę";
+    return `Priskirta ${thisCode} (${setupMm}): plotis ${job.widthMm} mm artimesnis nei ant ${otherCode}. Eilėje pirmiau pjaunami artimesni pločiai.`;
   }
   if (assignment.pickCriterion === "rate") {
-    return `Priskirta ${thisCode}: didesnis našumas (${machine.dailyRate} pal./d.).`;
+    const rate =
+      machine.piecesPerDay != null && machine.piecesPerDay > 0
+        ? `${machine.piecesPerDay.toLocaleString("lt-LT")} vnt./d.`
+        : `${machine.dailyRate} pal./d. (legacy)`;
+    return `Priskirta ${thisCode}: didesnis našumas (${rate}).`;
   }
 
   if (assignment.changeoverHours > 0) {
@@ -231,8 +263,39 @@ function buildAssignmentReason(
   return `Priskirta ${thisCode} pagal ankstesnę pradžią (${thisStart}).`;
 }
 
-async function buildSchedule(): Promise<BuiltSchedule | null> {
-  await ensureShopMachines();
+function computeRebalanceState(
+  machineRows: (typeof machines.$inferSelect)[],
+  lockedWeekItems: QueuePlanItemRow[],
+  lockedWeek: LockedWeek | null,
+  planStatus: "ready" | "accepted" | null,
+): RebalanceState | null {
+  if (!lockedWeek || planStatus !== "ready" || lockedWeekItems.length === 0) {
+    return null;
+  }
+
+  const shopMachines = machineRows.filter((machine) =>
+    (SHOP_MACHINE_ORDER as readonly string[]).includes(machine.code),
+  );
+
+  return analyzeRebalanceState(
+    shopMachines.map((machine) => machine.id),
+    lockedWeekItems.map((item) => ({
+      jobId: item.jobId,
+      machineId: item.machineId,
+      widthMm: item.widthMm,
+      plannedStart: item.plannedStart,
+      plannedEnd: item.plannedEnd,
+    })),
+    shopMachines.map((machine) => ({
+      id: machine.id,
+      code: machine.code,
+      currentWidthMm: machine.currentWidthMm,
+    })),
+    lockedWeek,
+  );
+}
+
+const buildSchedule = cache(async (): Promise<BuiltSchedule | null> => {
   const [jobRows, machineRows] = await Promise.all([
     loadQueuedJobs(),
     db.select().from(machines).orderBy(asc(machines.code)),
@@ -253,6 +316,10 @@ async function buildSchedule(): Promise<BuiltSchedule | null> {
       aiComments: [],
       aiSource: null,
       planRunId: null,
+      planStatus: null,
+      planItemByJob: new Map(),
+      moveReasonByJob: new Map(),
+      rebalanceState: null,
     };
   }
 
@@ -262,18 +329,24 @@ async function buildSchedule(): Promise<BuiltSchedule | null> {
   const machineById = new Map(machineRows.map((machine) => [machine.id, machine]));
 
   const latestRun = await getLatestPlanRun();
-  let assignments = scheduleQueue(
-    toPlannerMachines(machineRows),
-    toPlannerJobs(jobRows),
-  );
   let lockedWeek: LockedWeek | null = null;
   let laterLockedCount = 0;
   let aiComments: string[] = [];
   let aiSource: "claude" | "mock" | null = null;
   let planRunId: string | null = null;
+  let planStatus: "ready" | "accepted" | null = null;
+  let planItemByJob = new Map<string, QueuePlanItemRow>();
+  let moveReasonByJob = new Map<string, string>();
+  let lockedWeekItems: QueuePlanItemRow[] = [];
 
   if (latestRun) {
     planRunId = latestRun.id;
+    planStatus =
+      latestRun.status === "accepted"
+        ? "accepted"
+        : latestRun.status === "ready"
+          ? "ready"
+          : null;
     lockedWeek = {
       startIso: latestRun.lockedWeekStart,
       endIso: latestRun.lockedWeekEnd,
@@ -288,27 +361,109 @@ async function buildSchedule(): Promise<BuiltSchedule | null> {
     }
     aiSource = latestRun.aiSource === "claude" ? "claude" : "mock";
 
-    const items = await getPlanItemsForRun(latestRun.id);
-    const itemByJob = new Map(items.map((item) => [item.jobId, item]));
-    assignments = assignments.map((assignment) => {
-      const item = itemByJob.get(assignment.jobId);
-      if (!item) return assignment;
-      return {
-        ...assignment,
-        machineId: item.machineId,
-        estimatedStart: new Date(item.plannedStart),
-        estimatedEnd: new Date(item.plannedEnd),
-        priority: (item.priority as ClusterPriority) ?? assignment.priority,
-        tileWidthMm: item.widthMm || assignment.tileWidthMm,
-        storisMm: item.storisMm || assignment.storisMm,
-      };
-    });
-    laterLockedCount = items.filter((item) => !item.lockedWeek).length;
+    const activeJobIds = jobRows.map((job) => job.id);
+    const week: LockedWeek = {
+      startIso: latestRun.lockedWeekStart,
+      endIso: latestRun.lockedWeekEnd,
+    };
+
+    const [activePlanItems, laterCountRow] = await Promise.all([
+      activeJobIds.length > 0
+        ? db
+            .select()
+            .from(queuePlanItems)
+            .where(
+              and(
+                eq(queuePlanItems.runId, latestRun.id),
+                inArray(queuePlanItems.jobId, activeJobIds),
+              ),
+            )
+        : Promise.resolve([]),
+      db
+        .select({ value: count() })
+        .from(queuePlanItems)
+        .where(
+          and(
+            eq(queuePlanItems.runId, latestRun.id),
+            eq(queuePlanItems.lockedWeek, false),
+          ),
+        ),
+    ]);
+
+    planItemByJob = new Map(
+      activePlanItems.map((item) => [item.jobId, item]),
+    );
+    laterLockedCount = laterCountRow[0]?.value ?? 0;
+
+    lockedWeekItems =
+      planStatus === "ready"
+        ? activePlanItems.filter((item) =>
+            isJobStartInLockedPlanWeek(item.plannedStart, week),
+          )
+        : [];
+
+    const overrideRows = await db
+      .select()
+      .from(queueOverrides)
+      .where(eq(queueOverrides.runId, latestRun.id))
+      .orderBy(desc(queueOverrides.createdAt));
+    for (const row of overrideRows) {
+      const planItem = planItemByJob.get(row.jobId);
+      if (planItem && planItem.machineId !== row.toMachineId) {
+        continue;
+      }
+      if (!moveReasonByJob.has(row.jobId)) {
+        moveReasonByJob.set(row.jobId, row.reason);
+      }
+    }
   }
 
-  const assignmentMap = new Map(
-    assignments.map((assignment) => [assignment.jobId, assignment]),
+  const inProgressWithoutPlan = jobRows.filter(
+    (job) => job.status === "in_progress" && !planItemByJob.has(job.id),
   );
+  const assignments =
+    planItemByJob.size === 0
+      ? scheduleQueue(toPlannerMachines(machineRows), toPlannerJobs(jobRows))
+      : inProgressWithoutPlan.length > 0
+        ? scheduleQueue(
+            toPlannerMachines(machineRows),
+            toPlannerJobs(inProgressWithoutPlan),
+          )
+        : [];
+
+  let assignmentMap: Map<string, ReturnType<typeof scheduleQueue>[number]>;
+  if (planItemByJob.size > 0) {
+    assignmentMap = new Map();
+    for (const job of jobRows) {
+      const item = planItemByJob.get(job.id);
+      const machine = item ? machineById.get(item.machineId) : undefined;
+      if (item && machine) {
+        assignmentMap.set(job.id, assignmentFromPlanItem(item, job, machine));
+      }
+    }
+    for (const assignment of assignments) {
+      if (assignmentMap.has(assignment.jobId)) {
+        continue;
+      }
+      const job = jobRows.find((row) => row.id === assignment.jobId);
+      if (job?.status === "in_progress") {
+        assignmentMap.set(assignment.jobId, assignment);
+      }
+    }
+  } else {
+    assignmentMap = new Map(
+      assignments.map((assignment) => [assignment.jobId, assignment]),
+    );
+  }
+
+  const rebalanceState = latestRun
+    ? computeRebalanceState(
+        machineRows,
+        lockedWeekItems,
+        lockedWeek,
+        planStatus,
+      )
+    : null;
 
   return {
     assignments,
@@ -322,7 +477,29 @@ async function buildSchedule(): Promise<BuiltSchedule | null> {
     aiComments,
     aiSource,
     planRunId,
+    planStatus,
+    planItemByJob,
+    moveReasonByJob,
+    rebalanceState,
   };
+});
+
+function isJobVisibleInLockedWeek(
+  job: QueuedJob,
+  assignment: ReturnType<typeof scheduleQueue>[number],
+  lockedWeek: LockedWeek,
+  planItemByJob: Map<string, QueuePlanItemRow>,
+): boolean {
+  if (job.status === "in_progress") {
+    return true;
+  }
+  const planItem = planItemByJob.get(job.id);
+  const start =
+    planItem?.plannedStart ??
+    (assignment.estimatedStart instanceof Date
+      ? assignment.estimatedStart.toISOString()
+      : String(assignment.estimatedStart));
+  return isJobStartInLockedPlanWeek(start, lockedWeek);
 }
 
 function toJobScheduleInfo(
@@ -332,8 +509,17 @@ function toJobScheduleInfo(
   positionInQueue: number,
   assignmentReason: string,
   workNormPiecesPerDay?: number,
+  moveReason?: string,
 ): JobScheduleInfo {
   const productionHours = assignment.durationHours - assignment.changeoverHours;
+  const estimatedStartIso = assignment.estimatedStart.toISOString();
+  const productionStartIso =
+    assignment.changeoverHours > 0
+      ? advanceWorkHours(
+          assignment.estimatedStart,
+          assignment.changeoverHours,
+        ).toISOString()
+      : estimatedStartIso;
 
   return {
     widthMm: job.widthMm,
@@ -351,11 +537,13 @@ function toJobScheduleInfo(
     productionHours,
     changeoverHours: assignment.changeoverHours,
     durationHours: assignment.durationHours,
-    estimatedStart: assignment.estimatedStart.toISOString(),
+    estimatedStart: estimatedStartIso,
+    productionStart: productionStartIso,
     estimatedEnd: assignment.estimatedEnd.toISOString(),
     positionInQueue,
     requiresChangeover: assignment.changeoverHours > 0,
     assignmentReason,
+    moveReason,
     priority: assignment.priority,
     editable: false,
   };
@@ -382,27 +570,44 @@ function toApiQueueJob(
   };
 }
 
-function sortJobsForLane(
-  laneJobs: { job: QueuedJob; assignment: ReturnType<typeof scheduleQueue>[number] }[],
-  machineCurrentWidthMm: number,
-): { job: QueuedJob; assignment: ReturnType<typeof scheduleQueue>[number] }[] {
-  const inProgress = laneJobs.filter((item) => item.job.status === "in_progress");
-  const rest = laneJobs.filter((item) => item.job.status !== "in_progress");
-  const startWidthMm =
-    inProgress.length > 0
-      ? inProgress[inProgress.length - 1].job.widthMm
-      : machineCurrentWidthMm;
+function assignmentFromPlanItem(
+  item: QueuePlanItemRow,
+  job: QueuedJob,
+  machine: (typeof machines.$inferSelect),
+): ReturnType<typeof scheduleQueue>[number] {
+  const estimatedStart = new Date(item.plannedStart);
+  const estimatedEnd = new Date(item.plannedEnd);
+  const durationHours = durationHoursFromPlan(estimatedStart, estimatedEnd);
+  const jobWidth = item.widthMm || job.widthMm;
 
-  const orderedRest = orderJobsByP1P2P3(
-    rest,
-    startWidthMm,
-    inProgress.at(-1)?.job.storisMm ?? 0,
-    (item) => item.job.widthMm,
-    (item) => item.job.storisMm,
-    (item) => item.job.deadline,
-  );
+  return {
+    jobId: item.jobId,
+    machineId: item.machineId,
+    proposalId: job.proposalId,
+    cutType: "",
+    tileWidthMm: jobWidth,
+    storisMm: item.storisMm || job.storisMm,
+    quantityPallets: toPalletCount(job),
+    durationHours,
+    changeoverHours: 0,
+    estimatedStart,
+    estimatedEnd,
+    pickCriterion: "width",
+    pickStartHours: 0,
+    otherMachineId: null,
+    otherStartHours: null,
+    priority: (item.priority as ClusterPriority) ?? "P3",
+  };
+}
 
-  return [...inProgress, ...orderedRest];
+function toPlannerMachine(machine: (typeof machines.$inferSelect)): PlannerMachine {
+  return {
+    id: machine.id,
+    currentWidthMm: machine.currentWidthMm ?? 0,
+    dailyRatePieces: machine.dailyRate,
+    changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
+    piecesPerDay: machine.piecesPerDay ?? undefined,
+  };
 }
 
 export async function getScheduledQueue(): Promise<QueueResponse> {
@@ -415,14 +620,15 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     aiComments: [],
     aiSource: null,
     planRunId: null,
+    planStatus: null,
+    rebalance: null,
+    unassignedJobs: [],
   };
   const built = await buildSchedule();
   if (!built) {
     return empty;
   }
 
-  await ensureCuttingNorms();
-  await ensureWorkNorms();
   const workNormRows = await getWorkNorms();
   const workNormByCode = new Map(
     workNormRows.map((norm) => [norm.machineCode as MachineCode, norm.minPiecesPerDay]),
@@ -454,44 +660,74 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
       );
 
     const visibleJobs = built.lockedWeek
-      ? machineJobs.filter(
-          ({ job, assignment }) =>
-            job.status === "in_progress" ||
-            isTimestampInLockedWeek(assignment.estimatedStart, built.lockedWeek!),
+      ? machineJobs.filter(({ job, assignment }) =>
+          isJobVisibleInLockedWeek(
+            job,
+            assignment,
+            built.lockedWeek!,
+            built.planItemByJob,
+          ),
         )
       : machineJobs;
     const laterOnLane = built.lockedWeek
       ? machineJobs.length - visibleJobs.length
       : 0;
 
-    const effectiveWidth = getEffectiveMachineWidth(
-      machine.currentWidthMm,
-      visibleJobs.map((item) => item.job),
-    );
-    const machineCurrentWidthMm = effectiveWidth.widthMm;
-    const ordered = sortJobsForLane(visibleJobs, machine.currentWidthMm ?? 0);
+    const storedWidthMm = machine.currentWidthMm ?? 0;
+    const usePlanTimes = built.planItemByJob.size > 0;
+    const ordered = orderLaneJobsForDisplay(visibleJobs, machine, usePlanTimes);
+    const recalculated = usePlanTimes
+      ? ordered.map(({ assignment }) => assignment)
+      : recalculateLaneAssignments(
+          ordered.map(({ job, assignment }) => ({ job, assignment })),
+          toPlannerMachine(machine),
+        );
     const machineCode = machine.code as MachineCode;
     const workNormPiecesPerDay =
       workNormByCode.get(machineCode) ?? machine.piecesPerDay ?? undefined;
 
-    const laneJobs: ApiQueueJob[] = ordered.map(({ job, assignment }, index) => {
+    let setupWidthMm = storedWidthMm > 0 ? storedWidthMm : 0;
+    const laneJobs: ApiQueueJob[] = ordered.map(({ job, assignment: _assignment }, index) => {
+      let assignment = recalculated[index] ?? _assignment;
+      const changeoverHours = changeoverHoursFromSetup(
+        setupWidthMm,
+        job.widthMm,
+        DEFAULT_CHANGEOVER_MINUTES,
+      );
+      assignment = { ...assignment, changeoverHours };
+      setupWidthMm = nextSetupWidthAfterJob(setupWidthMm, job.widthMm);
+      const previousJob = index > 0 ? ordered[index - 1].job : null;
+      const priority = jobPriority(
+        { tileWidthMm: job.widthMm, storisMm: job.storisMm },
+        previousJob
+          ? { tileWidthMm: previousJob.widthMm, storisMm: previousJob.storisMm }
+          : null,
+        machine.currentWidthMm ?? 0,
+      );
+      const assignmentWithPriority = { ...assignment, priority };
       const assignmentReason = buildAssignmentReason(
         job,
         machine,
-        assignment,
+        assignmentWithPriority,
         built.machineById,
       );
       const schedule = toJobScheduleInfo(
         job,
-        assignment,
+        assignmentWithPriority,
         machine,
         index + 1,
         assignmentReason,
         workNormPiecesPerDay,
+        built.moveReasonByJob.get(job.id),
       );
       schedule.editable = Boolean(
         built.lockedWeek &&
-          isTimestampInLockedWeek(assignment.estimatedStart, built.lockedWeek),
+          isJobVisibleInLockedWeek(
+            job,
+            assignmentWithPriority,
+            built.lockedWeek,
+            built.planItemByJob,
+          ),
       );
       const apiJob = toApiQueueJob(job, schedule);
 
@@ -507,9 +743,13 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
       code: machineCode,
       shopCode: machineShopCode(machine),
       name: machine.title,
-      currentWidthMm: machineCurrentWidthMm,
-      widthSource: effectiveWidth.source,
-      widthHint: machineWidthHint(effectiveWidth),
+      storedWidthMm,
+      currentWidthMm: storedWidthMm,
+      widthSource: storedWidthMm > 0 ? "stored" : "unset",
+      widthHint:
+        storedWidthMm > 0
+          ? "Admin nustatymas — keičia tik operatorius"
+          : "Nustatykite plotį konvejerių ekrane",
       dailyRatePallets: machine.dailyRate,
       workNormPiecesPerDay,
       rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
@@ -532,15 +772,42 @@ export async function getScheduledQueue(): Promise<QueueResponse> {
     });
   }
 
+  const rebalanceState = built.rebalanceState;
+  const aiComments =
+    rebalanceState != null
+      ? alignAiCommentsWithRebalance(built.aiComments, rebalanceState)
+      : built.aiComments;
+
+  const unassignedJobs = built.jobRows
+    .filter((job) => {
+      if (job.status === "in_progress") {
+        return false;
+      }
+      if (built.planItemByJob.size > 0) {
+        return !built.planItemByJob.has(job.id);
+      }
+      return !built.assignmentMap.has(job.id);
+    })
+    .map((job) => toApiQueueJob(job));
+
   return {
     lanes,
     groups,
     lockedWeekStart: built.lockedWeek?.startIso ?? null,
     lockedWeekEnd: built.lockedWeek?.endIso ?? null,
     laterLockedCount: built.laterLockedCount,
-    aiComments: built.aiComments,
+    aiComments,
     aiSource: built.aiSource,
     planRunId: built.planRunId,
+    planStatus: built.planStatus,
+    rebalance: rebalanceState
+      ? {
+          canRebalance: rebalanceState.canRebalance,
+          pendingMoveCount: rebalanceState.pendingMoveCount,
+          reason: rebalanceState.reason,
+        }
+      : null,
+    unassignedJobs,
   };
 }
 
@@ -549,7 +816,16 @@ async function countLoggedQuantity(jobId: string): Promise<number> {
     .select()
     .from(palletLogs)
     .where(eq(palletLogs.jobId, jobId));
-  return logs.reduce((sum, log) => sum + log.quantity, 0);
+  return logs.reduce(
+    (sum, log) => sum + (log.goodQuantity > 0 ? log.goodQuantity : log.quantity),
+    0,
+  );
+}
+
+export interface PalletLogInput {
+  goodQuantity: number;
+  defectQuantity: number;
+  comment?: string;
 }
 
 function toShopJob(
@@ -579,10 +855,10 @@ function toShopJob(
   };
 }
 
-export async function getNextJobForUser(userId: string): Promise<NextJobResponse> {
+async function resolveUserMachine(
+  userId: string,
+): Promise<(typeof machines.$inferSelect) | undefined> {
   const rotationMachineId = await getActiveRotationMachineId(userId);
-
-  let machine: (typeof machines.$inferSelect) | undefined;
 
   if (rotationMachineId) {
     const [rotationMachine] = await db
@@ -590,20 +866,61 @@ export async function getNextJobForUser(userId: string): Promise<NextJobResponse
       .from(machines)
       .where(eq(machines.id, rotationMachineId))
       .limit(1);
-    machine = rotationMachine;
+    if (rotationMachine) return rotationMachine;
   }
 
+  const [assignment] = await db
+    .select({ machine: machines })
+    .from(machineAssignments)
+    .innerJoin(machines, eq(machineAssignments.machineId, machines.id))
+    .where(eq(machineAssignments.userId, userId))
+    .limit(1);
+  return assignment?.machine;
+}
+
+export interface LaneJobsForUser {
+  conveyor: ConveyorInfo | null;
+  jobs: ApiQueueJob[];
+  lockedWeekStart: string | null;
+  lockedWeekEnd: string | null;
+}
+
+export async function getLaneJobsForUser(userId: string): Promise<LaneJobsForUser> {
+  const machine = await resolveUserMachine(userId);
   if (!machine) {
-    const [assignment] = await db
-      .select({
-        machine: machines,
-      })
-      .from(machineAssignments)
-      .innerJoin(machines, eq(machineAssignments.machineId, machines.id))
-      .where(eq(machineAssignments.userId, userId))
-      .limit(1);
-    machine = assignment?.machine;
+    return {
+      conveyor: null,
+      jobs: [],
+      lockedWeekStart: null,
+      lockedWeekEnd: null,
+    };
   }
+
+  const queue = await getScheduledQueue();
+  const lane = queue.lanes.find((item) => item.code === machine.code);
+
+  const conveyor: ConveyorInfo = {
+    id: machine.id,
+    code: machine.code as MachineCode,
+    shopCode: machineShopCode(machine),
+    name: machine.title,
+    currentWidthMm: lane?.currentWidthMm ?? machine.currentWidthMm ?? 0,
+    dailyRatePallets: machine.dailyRate,
+    workNormPiecesPerDay: lane?.workNormPiecesPerDay,
+    rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
+    changeoverMinutes: DEFAULT_CHANGEOVER_MINUTES,
+  };
+
+  return {
+    conveyor,
+    jobs: lane?.jobs ?? [],
+    lockedWeekStart: queue.lockedWeekStart,
+    lockedWeekEnd: queue.lockedWeekEnd,
+  };
+}
+
+export async function getNextJobForUser(userId: string): Promise<NextJobResponse> {
+  const machine = await resolveUserMachine(userId);
 
   if (!machine) {
     return { conveyor: null, job: null };
@@ -644,34 +961,66 @@ export async function getNextJobForUser(userId: string): Promise<NextJobResponse
 export async function logJobPallet(
   jobId: string,
   userId: string,
+  input: PalletLogInput,
 ): Promise<ShopJob> {
   const allJobs = await loadQueuedJobs();
   const job = allJobs.find((item) => item.id === jobId);
   if (!job) throw new Error("Darbas nerastas.");
 
+  const goodQuantity = Math.max(0, Math.round(input.goodQuantity));
+  const defectQuantity = Math.max(0, Math.round(input.defectQuantity));
+  if (goodQuantity <= 0 && defectQuantity <= 0) {
+    throw new Error("QUANTITY_REQUIRED");
+  }
+
+  const palletCount = toPalletCount(job);
+  const expectedPerLog = expectedPiecesPerPallet(job.pieceCount, palletCount);
+  if (
+    requiresUnderPlanComment(goodQuantity, expectedPerLog) &&
+    !input.comment?.trim()
+  ) {
+    throw new Error("COMMENT_REQUIRED");
+  }
+
   await db.insert(palletLogs).values({
     id: crypto.randomUUID(),
     jobId,
     quantity: 1,
-    damaged: false,
+    goodQuantity,
+    defectQuantity,
+    comment: input.comment?.trim() || null,
+    damaged: defectQuantity > 0,
     loggedAt: new Date().toISOString(),
     loggedById: userId,
   });
 
+  const quantityLogged = await countLoggedQuantity(jobId);
+
   if (job.status === "queued") {
     await db
       .update(jobs)
-      .set({ status: "in_progress", startedAt: new Date().toISOString() })
+      .set({
+        status: "in_progress",
+        startedAt: new Date().toISOString(),
+        completedPieces: quantityLogged,
+      })
+      .where(eq(jobs.id, jobId));
+  } else {
+    await db
+      .update(jobs)
+      .set({ completedPieces: quantityLogged })
       .where(eq(jobs.id, jobId));
   }
 
-  const quantityLogged = await countLoggedQuantity(jobId);
+  await rescheduleRemainingWeek();
+
   const queue = await getScheduledQueue();
   const schedule = queue.lanes
     .flatMap((lane) => lane.jobs)
     .find((queued) => queued.id === jobId)?.schedule;
 
-  return toShopJob(job, quantityLogged, schedule);
+  const refreshed = allJobs.find((item) => item.id === jobId) ?? job;
+  return toShopJob(refreshed, quantityLogged, schedule);
 }
 
 export async function finishJob(
@@ -719,6 +1068,8 @@ export async function finishJob(
       finishedAt: new Date().toISOString(),
     })
     .where(eq(jobs.id, jobId));
+
+  await rescheduleRemainingWeek();
 
   return { completionPercent, managerSignalSaved };
 }
@@ -772,6 +1123,7 @@ export async function getAssignments(): Promise<AssignmentsResponse> {
       shopCode: machineShopCode(machine),
       name: machine.title,
       dailyRatePallets: machine.dailyRate,
+      workNormPiecesPerDay: machine.piecesPerDay ?? 0,
       rotationHours: machine.rotationHours ?? DEFAULT_ROTATION_HOURS,
       currentWidthMm: effectiveWidth.widthMm,
       storedWidthMm: machine.currentWidthMm ?? 0,
@@ -822,6 +1174,7 @@ export async function patchMachineSettings(
   machineId: string,
   patch: {
     dailyRatePallets?: number;
+    workNormPiecesPerDay?: number;
     rotationHours?: number;
     currentWidthMm?: number;
     shopCode?: string;
@@ -842,6 +1195,10 @@ export async function patchMachineSettings(
         patch.dailyRatePallets !== undefined
           ? patch.dailyRatePallets
           : machine.dailyRate,
+      piecesPerDay:
+        patch.workNormPiecesPerDay !== undefined
+          ? patch.workNormPiecesPerDay
+          : machine.piecesPerDay,
       rotationHours:
         patch.rotationHours !== undefined
           ? patch.rotationHours

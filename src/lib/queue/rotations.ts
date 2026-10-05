@@ -1,4 +1,4 @@
-import { asc, desc, eq, and, gte, lte } from "drizzle-orm";
+import { asc, desc, eq, and, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   machines,
@@ -106,33 +106,42 @@ export async function getRotationsAdminData(): Promise<RotationsAdminData> {
     machineRows.map((machine) => [machine.id, machine.code as MachineCode]),
   );
 
-  const history: RotationHistoryEntry[] = [];
-  for (const row of historyRows) {
-    const changedBy = row.history.changedById
+  const changedByIds = [
+    ...new Set(
+      historyRows
+        .map((row) => row.history.changedById)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const changedByRows =
+    changedByIds.length > 0
       ? await db
-          .select({ name: users.name })
+          .select({ id: users.id, name: users.name })
           .from(users)
-          .where(eq(users.id, row.history.changedById))
-          .limit(1)
+          .where(inArray(users.id, changedByIds))
       : [];
+  const changedByNameById = new Map(
+    changedByRows.map((row) => [row.id, row.name]),
+  );
 
-    history.push({
-      id: row.history.id,
-      changedAt: row.history.changedAt,
-      personName: row.personName,
-      fromCode: row.history.fromMachineId
-        ? machineCodeById.get(row.history.fromMachineId) ?? null
-        : null,
-      toCode: row.history.toMachineId
-        ? machineCodeById.get(row.history.toMachineId) ?? null
-        : null,
-      reason: row.history.reason,
-      action: row.history.action,
-      changedByName: changedBy[0]?.name ?? null,
-      periodStartDate: row.period.startDate,
-      periodEndDate: row.period.endDate,
-    });
-  }
+  const history: RotationHistoryEntry[] = historyRows.map((row) => ({
+    id: row.history.id,
+    changedAt: row.history.changedAt,
+    personName: row.personName,
+    fromCode: row.history.fromMachineId
+      ? machineCodeById.get(row.history.fromMachineId) ?? null
+      : null,
+    toCode: row.history.toMachineId
+      ? machineCodeById.get(row.history.toMachineId) ?? null
+      : null,
+    reason: row.history.reason,
+    action: row.history.action,
+    changedByName: row.history.changedById
+      ? changedByNameById.get(row.history.changedById) ?? null
+      : null,
+    periodStartDate: row.period.startDate,
+    periodEndDate: row.period.endDate,
+  }));
 
   return {
     periods,
@@ -309,6 +318,46 @@ export async function reassignRotation(
 
 export function defaultPeriodEnd(startDateIso: string): string {
   return formatDateIso(nextFridayFrom(parseDateIso(startDateIso)));
+}
+
+export interface UpdateRotationPeriodInput {
+  periodId: string;
+  startDate?: string;
+  endDate?: string;
+  note?: string | null;
+  changedById: string;
+}
+
+export async function updateRotationPeriod(
+  input: UpdateRotationPeriodInput,
+): Promise<RotationsAdminData> {
+  const [period] = await db
+    .select()
+    .from(rotationPeriods)
+    .where(eq(rotationPeriods.id, input.periodId))
+    .limit(1);
+
+  if (!period) throw new Error("Periodas nerastas.");
+
+  const startDate = input.startDate?.trim() || period.startDate;
+  const endDate = input.endDate?.trim() || period.endDate;
+  if (startDate > endDate) {
+    throw new Error("Periodo pabaiga negali būti anksčiau nei pradžia.");
+  }
+
+  const note =
+    input.note === undefined
+      ? period.note
+      : input.note?.trim()
+        ? input.note.trim()
+        : null;
+
+  await db
+    .update(rotationPeriods)
+    .set({ startDate, endDate, note })
+    .where(eq(rotationPeriods.id, input.periodId));
+
+  return getRotationsAdminData();
 }
 
 export async function listCechasPeople() {

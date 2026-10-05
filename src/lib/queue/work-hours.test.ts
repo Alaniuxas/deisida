@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   addWorkDuration,
+  durationHoursFromPlan,
+  isDuringLunchBreak,
   isWithinWorkHours,
   snapToWorkStart,
+  workHoursUntil,
   WORK_END_HOUR,
+  WORK_HOURS_PER_DAY,
   WORK_START_HOUR,
 } from "./work-hours";
 import { zonedTimeToUtc } from "./week";
@@ -15,7 +19,14 @@ function vilnius(year: number, month: number, day: number, hour = 0, minute = 0)
 }
 
 describe("work-hours scheduling", () => {
-  it("snaps a pre-08:00 start to 08:00 same workday", () => {
+  it("durationHoursFromPlan counts productive hours, not overnight wall-clock", () => {
+    const start = vilnius(2026, 10, 5, 8, 0);
+    const end = vilnius(2026, 10, 6, 12, 0);
+    expect(durationHoursFromPlan(start, end)).toBe(12);
+    expect((end.getTime() - start.getTime()) / 3600000).toBeGreaterThan(20);
+  });
+
+  it("snaps a before-08:00 start to 08:00", () => {
     const beforeOpen = vilnius(2026, 10, 5, 7, 30); // Monday
     const snapped = snapToWorkStart(beforeOpen);
     expect(isWithinWorkHours(snapped)).toBe(true);
@@ -28,6 +39,19 @@ describe("work-hours scheduling", () => {
     expect(snapped.getTime()).toBe(vilnius(2026, 10, 6, WORK_START_HOUR, 0).getTime());
   });
 
+  it("snaps lunch break to 13:00", () => {
+    const lunch = vilnius(2026, 10, 5, 12, 30);
+    expect(isDuringLunchBreak(lunch)).toBe(true);
+    expect(isWithinWorkHours(lunch)).toBe(false);
+    expect(snapToWorkStart(lunch).getTime()).toBe(vilnius(2026, 10, 5, 13, 0).getTime());
+  });
+
+  it("ends an 8 h job at 17:00 when starting at 08:00 (1 h lunch at 12:00)", () => {
+    const start = vilnius(2026, 10, 5, 8, 0);
+    const { end } = addWorkDuration(start, WORK_HOURS_PER_DAY);
+    expect(end.getTime()).toBe(vilnius(2026, 10, 5, WORK_END_HOUR, 0).getTime());
+  });
+
   it("continues overflow past 17:00 on the next workday at 08:00", () => {
     const start = vilnius(2026, 10, 5, 16, 0); // Monday 16:00
     const { start: jobStart, end } = addWorkDuration(start, 2);
@@ -38,13 +62,20 @@ describe("work-hours scheduling", () => {
   it("never schedules end after 17:00 on the same day", () => {
     const start = vilnius(2026, 10, 5, 8, 0);
     const { end } = addWorkDuration(start, 10);
-    expect(end.getTime()).toBe(vilnius(2026, 10, 6, 9, 0).getTime());
+    expect(end.getTime()).toBe(vilnius(2026, 10, 6, 10, 0).getTime());
   });
 
   it("skips weekends when continuing after Friday 17:00", () => {
     const fridayAfternoon = vilnius(2026, 10, 9, 16, 30); // Friday
     const { end } = addWorkDuration(fridayAfternoon, 1);
     expect(end.getTime()).toBe(vilnius(2026, 10, 12, 8, 30).getTime()); // Monday
+  });
+
+  it("counts work hours until Friday 17:00", () => {
+    const wednesday = vilnius(2026, 10, 7, 12, 54);
+    const fridayEnd = vilnius(2026, 10, 9, WORK_END_HOUR, 0);
+    const hours = workHoursUntil(wednesday, fridayEnd);
+    expect(hours).toBe(20);
   });
 });
 
@@ -72,7 +103,7 @@ describe("scheduleQueue work hours", () => {
     };
   }
 
-  it("planned_start and planned_end stay within 08:00–17:00 Vilnius", () => {
+  it("planned_start and planned_end stay within productive windows", () => {
     const referenceTime = vilnius(2026, 10, 5, 7, 0);
     const assignments = scheduleQueue(
       [makeMachine()],

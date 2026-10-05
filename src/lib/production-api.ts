@@ -9,6 +9,7 @@ import {
   ProductionApiError,
   QueueResponse,
   ReassignRotationRequest,
+  UpdateRotationPeriodRequest,
   RotationsAdminData,
   ShopJob,
 } from "@/lib/production-types";
@@ -103,8 +104,8 @@ export async function finishJob(
   });
 }
 
-export async function fetchQueue(): Promise<QueueResponse> {
-  return request<QueueResponse>("/api/jobs/queue");
+export async function fetchQueue(signal?: AbortSignal): Promise<QueueResponse> {
+  return request<QueueResponse>("/api/jobs/queue", { signal });
 }
 
 export async function fetchAssignments(): Promise<AssignmentsResponse> {
@@ -145,6 +146,15 @@ export async function createRotationPeriod(
 
 export async function reassignRotation(
   body: ReassignRotationRequest,
+): Promise<RotationsAdminData> {
+  return request<RotationsAdminData>("/api/admin/rotations", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateRotationPeriod(
+  body: UpdateRotationPeriodRequest,
 ): Promise<RotationsAdminData> {
   return request<RotationsAdminData>("/api/admin/rotations", {
     method: "PATCH",

@@ -21,6 +21,8 @@ export interface QueueJob {
   deadline: Date | string;
   cutType: CutType;
   proposalId: string;
+  /** Privalomas priskyrimas: STRESS demo, in_progress, nebaigtas iš patvirtinto plano. */
+  pinnedMachineId?: string;
 }
 
 export interface Assignment {

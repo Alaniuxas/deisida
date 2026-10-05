@@ -28,17 +28,23 @@ export async function POST(request: Request) {
     let jobId = "";
     let machineId = "";
     let reason = "";
+    let cutByIso = "";
+    let returnTo = "";
 
     if (contentType.includes("application/json")) {
       const body = await request.json();
       jobId = String(body.jobId ?? "").trim();
       machineId = String(body.machineId ?? "").trim();
       reason = String(body.reason ?? "").trim();
+      cutByIso = String(body.cutBy ?? body.cutByIso ?? "").trim();
+      returnTo = String(body.returnTo ?? "").trim();
     } else {
       const form = await request.formData();
       jobId = String(form.get("jobId") ?? "").trim();
       machineId = String(form.get("machineId") ?? "").trim();
       reason = String(form.get("reason") ?? "").trim();
+      cutByIso = String(form.get("cutBy") ?? "").trim();
+      returnTo = String(form.get("returnTo") ?? "").trim();
     }
 
     const result = await applyQueueOverride({
@@ -46,6 +52,7 @@ export async function POST(request: Request) {
       machineId,
       reason,
       userId: user.userId,
+      cutByIso: cutByIso || undefined,
     });
 
     if (!result.ok) {
@@ -58,7 +65,9 @@ export async function POST(request: Request) {
     }
 
     if (formPost) {
-      return redirectToPath("/eile?moved=1");
+      const safeReturn =
+        returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/eile?moved=1";
+      return redirectToPath(safeReturn);
     }
     return jsonOk({ ok: true });
   } catch (error) {

@@ -1,6 +1,11 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import type { LockedWeek } from "./week";
+import {
+  alignAiCommentsWithRebalance,
+  REBALANCE_RULES_FOR_AI,
+  type RebalanceState,
+} from "./rebalance";
 
 export interface AuditJobSummary {
   jobId: string;
@@ -20,11 +25,18 @@ export interface AuditOverrideSummary {
   createdAt: string;
 }
 
+export interface AuditMachineSummary {
+  code: string;
+  currentWidthMm: number | null;
+}
+
 export interface AuditInput {
   lockedWeek: LockedWeek;
   jobs: AuditJobSummary[];
   overrides: AuditOverrideSummary[];
   machineCodes: string[];
+  machines: AuditMachineSummary[];
+  rebalanceState: RebalanceState;
 }
 
 export interface AuditResult {
@@ -32,28 +44,23 @@ export interface AuditResult {
   source: "claude" | "mock";
 }
 
-const MODEL = anthropic("claude-sonnet-4-6");
+const DEFAULT_MODEL_ID = process.env.ANTHROPIC_MODEL?.trim() || "claude-sonnet-5";
+const MODEL = anthropic(DEFAULT_MODEL_ID);
 
 function heuristicComments(input: AuditInput): string[] {
-  const comments: string[] = [];
-  const weekJobs = input.jobs.filter((job) => job.lockedWeek);
-  for (const code of input.machineCodes) {
-    const count = weekJobs.filter((job) => job.machineCode === code).length;
-    if (count === 0) {
-      comments.push(
-        `${code} tuščia visą užrakintą savaitę (${input.lockedWeek.startIso}–${input.lockedWeek.endIso}).`,
-      );
-    }
+  if (!input.rebalanceState.canRebalance) {
+    return [];
   }
-  if (input.overrides.length > 0) {
+
+  const comments: string[] = [];
+  const next = input.rebalanceState.nextMove;
+  if (next) {
     comments.push(
-      `Paskutiniai rankiniai keitimai: ${input.overrides.length} (naudoti kaip pavyzdžiai kitam penktadieniui, nepriskirti mm).`,
+      `${next.donorCode} → ${next.receiverCode}: perkelti ${next.candidate.widthMm} mm darbą (${input.rebalanceState.pendingMoveCount} galimi perkėlimai).`,
     );
   }
-  if (comments.length === 0) {
-    comments.push("Savaitės apkrova paskirstyta pagal P1/P2/P3; akivaizdžių tuščių staklių nėra.");
-  }
-  return comments;
+
+  return comments.slice(0, 5);
 }
 
 export async function auditQueuePlan(input: AuditInput): Promise<AuditResult> {
@@ -65,34 +72,68 @@ export async function auditQueuePlan(input: AuditInput): Promise<AuditResult> {
     };
   }
 
-  const prompt = `Tu esi Deisida gamybos eilės auditorius. Variklis jau balansuoja darbus per stakles ir dienas (P1/P2/P3 + apkrovos balansas).
-Jei vis tiek matai akivaizdžių spragų užrakintoje savaitėje, pasiūlyk konkretų darbo perkėlimą tarp staklių (tik locked week).
-Grąžink 3–6 trumpas lietuviškas pastabas (kiekviena eilutė atskira), pvz. tuščios staklės, netolygus krūvis, override istorijos pamokos.
+  const prompt = `Tu esi Deisida gamybos eilės auditorius.
+Grąžink tik 3–5 trumpas lietuviškas eilutes (be įžangos, be numeracijos, be markdown).
+Kiekviena eilutė: [STAKLĖ] konkretus veiksmas arba problema.
+
+${REBALANCE_RULES_FOR_AI}
+
+Dabartinė automatinio perskirstymo būsena: ${JSON.stringify({
+    canRebalance: input.rebalanceState.canRebalance,
+    pendingMoveCount: input.rebalanceState.pendingMoveCount,
+    reason: input.rebalanceState.reason,
+    blockers: input.rebalanceState.blockers,
+    nextMove: input.rebalanceState.nextMove
+      ? {
+          from: input.rebalanceState.nextMove.donorCode,
+          to: input.rebalanceState.nextMove.receiverCode,
+          widthMm: input.rebalanceState.nextMove.candidate.widthMm,
+        }
+      : null,
+  })}
+
+Jei canRebalance=false — NESIŪLYK automatinio perkėlimo; paaiškink kodėl (plotis ±5 mm).
+Jei canRebalance=true — galima siūlyti tik tuos perkėlimus, kuriuos leidžia būsena.
+
 Užrakinta savaitė: ${input.lockedWeek.startIso} – ${input.lockedWeek.endIso}
-Staklės: ${input.machineCodes.join(", ")}
-Darbai savaitėje: ${JSON.stringify(weekJobs(input), null, 2)}
-Overrides: ${JSON.stringify(input.overrides.slice(0, 20), null, 2)}`;
+Staklės ir admin plotis (mm): ${JSON.stringify(input.machines)}
+Darbų skaičius per staklę: ${JSON.stringify(
+    Object.fromEntries(
+      input.machineCodes.map((code) => [
+        code,
+        weekJobs(input).filter((job) => job.machine === code).length,
+      ]),
+    ),
+  )}
+Darbai: ${JSON.stringify(weekJobs(input).slice(0, 40))}
+Overrides: ${JSON.stringify(input.overrides.slice(0, 10))}`;
 
   try {
     const { text } = await generateText({
       model: MODEL,
       prompt,
     });
-    const comments = text
-      .split(/\n+/)
-      .map((line) => line.replace(/^[\s\-*•\d.]+/, "").trim())
-      .filter((line) => line.length > 8)
-      .slice(0, 8);
+    const comments = alignAiCommentsWithRebalance(
+      text
+        .split(/\n+/)
+        .map((line) => line.replace(/^[\s\-*•\d.]+/, "").trim())
+        .filter((line) => line.length > 6 && !/^išanalizav/i.test(line))
+        .slice(0, 5),
+      input.rebalanceState,
+    );
     if (comments.length === 0) {
-      return { comments: mock, source: "mock" };
+      return { comments: [], source: "claude" };
     }
     return { comments, source: "claude" };
   } catch {
     return {
-      comments: [
-        "AI patarimų generavimas laikinai nepasiekiamas — rodomos automatinės pastabos.",
-        ...mock,
-      ],
+      comments: alignAiCommentsWithRebalance(
+        [
+          "AI patarimų generavimas laikinai nepasiekiamas — rodomos automatinės pastabos.",
+          ...mock,
+        ],
+        input.rebalanceState,
+      ),
       source: "mock",
     };
   }

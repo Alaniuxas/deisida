@@ -1,3 +1,14 @@
+export interface Disc {
+  id: string;
+  name: string;
+  description?: string;
+  diameterMm?: number;
+  thicknessMm?: number;
+  supplier?: string;
+  priceEur?: number;
+  workId?: string;
+}
+
 export interface Tile {
   id: string;
   name: string;
@@ -10,6 +21,7 @@ export interface Tile {
   heightMm: number;
   defaultStorisMm: number;
   description?: string;
+  discId?: string;
   disc?: string;
   hardness?: number;
   fragilityStrip?: string;

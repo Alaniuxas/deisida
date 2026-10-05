@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getIronSession } from "iron-session";
 import type { SessionData } from "@/lib/auth";
+import { redirectFromRequest } from "@/lib/request-url";
 
 const sessionOptions = {
   password:
@@ -16,7 +17,14 @@ const sessionOptions = {
   },
 };
 
-const publicPaths = ["/prisijungti", "/api/auth/login", "/api/cron/queue-plan"];
+const publicPaths = [
+  "/prisijungti",
+  "/cechas/prisijungti",
+  "/api/auth/login",
+  "/api/auth/pin",
+  "/api/auth/logout",
+  "/api/cron/queue-plan",
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -37,9 +45,11 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Reikalingas prisijungimas." }, { status: 401 });
     }
-    const loginUrl = new URL("/prisijungti", request.url);
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+    const loginUrl = redirectFromRequest(
+      request.url,
+      `/prisijungti?next=${encodeURIComponent(pathname)}`,
+    );
+    return loginUrl;
   }
 
   if (
@@ -47,15 +57,15 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith("/cechas") &&
     !pathname.startsWith("/api/jobs")
   ) {
-    return NextResponse.redirect(new URL("/cechas", request.url));
+    return redirectFromRequest(request.url, "/cechas");
   }
 
   if (session.role === "pardavimai" && pathname.startsWith("/admin")) {
-    return NextResponse.redirect(new URL("/pasiulymai", request.url));
+    return redirectFromRequest(request.url, "/pasiulymai");
   }
 
   if (session.role === "pardavimai" && pathname.startsWith("/cechas")) {
-    return NextResponse.redirect(new URL("/pasiulymai", request.url));
+    return redirectFromRequest(request.url, "/pasiulymai");
   }
 
   if (
@@ -65,14 +75,14 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith("/eile") &&
     !pathname.startsWith("/api/")
   ) {
-    return NextResponse.redirect(new URL("/pasiulymai", request.url));
+    return redirectFromRequest(request.url, "/pasiulymai");
   }
 
   if (pathname === "/") {
     if (session.role === "cechas") {
-      return NextResponse.redirect(new URL("/cechas", request.url));
+      return redirectFromRequest(request.url, "/cechas");
     }
-    return NextResponse.redirect(new URL("/pasiulymai", request.url));
+    return redirectFromRequest(request.url, "/pasiulymai");
   }
 
   return response;
